@@ -4,6 +4,10 @@ from textual.widgets import OptionList
 from textual.widgets.option_list import Option
 from textual.message import Message
 
+from .command_parser import AWSCommandParser, CompletionContext
+from .parameter_metadata import get_parameter_metadata, format_parameter_help
+from .resource_suggester import ResourceSuggester
+
 
 class CommandAutocomplete(OptionList):
     """Enhanced autocomplete with fuzzy matching and highlighting."""
@@ -20,8 +24,18 @@ class CommandAutocomplete(OptionList):
         self.all_commands = commands
         self.command_categories = command_categories
         self.filtered_commands: list[str] = []
-        self.display = False  # Hidden by default
-        self.can_focus = False  # Don't steal focus from Input
+        self.display = False
+        self.can_focus = False
+
+        self.parser = AWSCommandParser()
+        self.use_intelligent_autocomplete = True
+        self.resource_suggester: ResourceSuggester | None = None
+        self.enable_resource_suggestions = True
+
+    def set_aws_context(self, profile: str | None, region: str | None) -> None:
+        """Set AWS profile and region for resource suggestions."""
+        if self.enable_resource_suggestions:
+            self.resource_suggester = ResourceSuggester(profile, region)
 
     def fuzzy_match(self, text: str, query: str) -> tuple[bool, int]:
         """
@@ -31,14 +45,11 @@ class CommandAutocomplete(OptionList):
         text_lower = text.lower()
         query_lower = query.lower()
 
-        # Exact substring match - highest score
         if query_lower in text_lower:
-            # Score based on position (earlier is better)
             position = text_lower.find(query_lower)
             score = 100 - (position * 2)
             return (True, max(score, 80))
 
-        # Fuzzy match - all chars in order
         text_idx = 0
         query_idx = 0
         matches = 0
@@ -50,7 +61,6 @@ class CommandAutocomplete(OptionList):
             text_idx += 1
 
         if query_idx == len(query_lower):
-            # All query chars found in order
             score = int((matches / len(text_lower)) * 60)
             return (True, max(score, 20))
 
@@ -71,15 +81,89 @@ class CommandAutocomplete(OptionList):
 
         return text
 
-    def filter_commands(self, query: str) -> None:
-        """Filter commands with fuzzy matching and scoring."""
+    def filter_commands(self, query: str, cursor_pos: int | None = None) -> None:
+        """
+        Filter commands with intelligent or fuzzy matching.
+
+        Args:
+            query: The command line input
+            cursor_pos: Cursor position in the input (for intelligent parsing)
+        """
         if not query or len(query) < 2:
             self.display = False
             self.filtered_commands = []
             self.clear_options()
             return
 
-        # Fuzzy match with scores
+        if self.use_intelligent_autocomplete and query.strip().startswith("aws "):
+            self._intelligent_filter(query, cursor_pos)
+        else:
+            self._fuzzy_filter(query)
+
+    def _intelligent_filter(self, query: str, cursor_pos: int | None = None) -> None:
+        """Use intelligent parser for context-aware suggestions."""
+        parsed = self.parser.parse(query, cursor_pos)
+        suggestions = self.parser.get_suggestions(parsed)
+
+        if (parsed.current_context == CompletionContext.PARAMETER_VALUE and
+                self.resource_suggester and parsed.service and parsed.command):
+            last_param = None
+            for param, value in reversed(list(parsed.parameters.items())):
+                if value is None:
+                    last_param = param
+                    break
+
+            if last_param:
+                resource_suggestions = self.resource_suggester.get_suggestions_for_parameter(
+                    parsed.service, parsed.command, last_param
+                )
+                if resource_suggestions:
+                    query_lower = parsed.current_token.lower()
+                    filtered_resources = [
+                        r for r in resource_suggestions
+                        if query_lower in r.lower()
+                    ]
+                    if filtered_resources:
+                        suggestions = filtered_resources[:10]
+
+        if suggestions:
+            self.filtered_commands = suggestions[:10]
+
+            self.clear_options()
+            for suggestion in self.filtered_commands:
+                if parsed.current_context == CompletionContext.SERVICE:
+                    badge = "[dim cyan]SVC[/dim cyan]"
+                    description = ""
+                elif parsed.current_context == CompletionContext.COMMAND:
+                    badge = "[dim green]CMD[/dim green]"
+                    description = ""
+                elif parsed.current_context == CompletionContext.PARAMETER:
+                    badge = "[dim yellow]OPT[/dim yellow]"
+                    metadata = get_parameter_metadata(parsed.service, suggestion)
+                    if metadata:
+                        required_mark = "*" if metadata.required else ""
+                        description = f" [{metadata.param_type.value}]{required_mark} {metadata.description[:40]}"
+                    else:
+                        description = ""
+                elif parsed.current_context == CompletionContext.PARAMETER_VALUE:
+                    badge = "[dim magenta]VAL[/dim magenta]"
+                    description = ""
+                else:
+                    badge = ""
+                    description = ""
+
+                highlighted = self.highlight_match(suggestion, parsed.current_token)
+                label_text = f"{badge} {highlighted}{description}"
+                self.add_option(Option(label_text, id=suggestion))
+
+            self.display = True
+            if len(self.filtered_commands) > 0:
+                self.highlighted = 0
+        else:
+            self._fuzzy_filter(query)
+
+    def _fuzzy_filter(self, query: str) -> None:
+        """Legacy fuzzy matching filter (fallback)."""
         matches = []
         for cmd in self.all_commands:
             matched, score = self.fuzzy_match(cmd, query)
@@ -87,31 +171,25 @@ class CommandAutocomplete(OptionList):
                 matches.append((cmd, score))
 
         if matches:
-            # Sort by score (highest first)
             matches.sort(key=lambda x: x[1], reverse=True)
             self.filtered_commands = [cmd for cmd, _ in matches[:10]]
 
             self.clear_options()
             for cmd in self.filtered_commands:
-                # Get category for badge
                 category = self.command_categories.get(cmd, "")
                 if category:
-                    # Shorten category name for badge
                     badge_text = category.split("/")[0][:4].upper()
                     badge = f"[dim cyan]{badge_text}[/dim cyan]"
                 else:
                     badge = ""
 
-                # Highlight matching substring
                 highlighted = self.highlight_match(cmd, query)
-
-                # Create option with badge and highlighted command
                 label_text = f"{badge} {highlighted}" if badge else highlighted
                 self.add_option(Option(label_text, id=cmd))
 
             self.display = True
             if len(self.filtered_commands) > 0:
-                self.highlighted = 0  # Select first item
+                self.highlighted = 0
         else:
             self.display = False
             self.filtered_commands = []
@@ -132,3 +210,55 @@ class CommandAutocomplete(OptionList):
         """Move selection up."""
         if self.filtered_commands and self.highlighted is not None:
             self.highlighted = max(self.highlighted - 1, 0)
+
+    def smart_insert_selection(
+        self, current_value: str, cursor_pos: int, selection: str
+    ) -> tuple[str, int]:
+        """
+        Intelligently insert the selected suggestion into the command line.
+
+        Preserves all content before and after the current token being completed,
+        replacing only the incomplete token with the selection.
+
+        Args:
+            current_value: Current command line text
+            cursor_pos: Current cursor position
+            selection: Selected suggestion to insert
+
+        Returns:
+            Tuple of (new_value, new_cursor_position)
+        """
+        if not self.use_intelligent_autocomplete or not current_value.strip().startswith("aws "):
+            return (selection, len(selection))
+
+        parsed = self.parser.parse(current_value, cursor_pos)
+        text_after_cursor = current_value[cursor_pos:]
+        token_start = cursor_pos - len(parsed.current_token)
+
+        if parsed.current_context in (
+            CompletionContext.SERVICE,
+            CompletionContext.COMMAND,
+            CompletionContext.PARAMETER,
+            CompletionContext.PARAMETER_VALUE,
+        ):
+            new_value = (
+                current_value[:token_start] +
+                selection +
+                " " +
+                text_after_cursor.lstrip()
+            )
+            new_cursor = token_start + len(selection) + 1
+        else:
+            if parsed.current_token:
+                new_value = (
+                    current_value[:token_start] +
+                    selection +
+                    " " +
+                    text_after_cursor.lstrip()
+                )
+                new_cursor = token_start + len(selection) + 1
+            else:
+                new_value = current_value.rstrip() + " " + selection + " "
+                new_cursor = len(new_value)
+
+        return (new_value, new_cursor)

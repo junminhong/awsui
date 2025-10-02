@@ -522,7 +522,6 @@ class AWSUIApp(App):
         yield Header(show_clock=True)
 
         with Horizontal(id="content"):
-            # Left pane: Profiles
             with Vertical(id="left-pane"):
                 yield Static(self.lang["panel_profiles"], classes="section-title")
 
@@ -586,13 +585,11 @@ class AWSUIApp(App):
             )
             return
 
-        # Update profile list
         profile_list = self.query_one("#profile-list", ProfileList)
         profile_list.all_profiles = self.profiles
         profile_list.filtered_profiles = self.profiles.copy()
         profile_list.refresh_items()
 
-        # Pre-select profile if specified
         if self.preselect_profile:
             for i, p in enumerate(self.profiles):
                 if p["name"] == self.preselect_profile:
@@ -730,18 +727,13 @@ class AWSUIApp(App):
 
     def on_key(self, event: events.Key) -> None:
         """Handle global key events when Input has focus."""
-
-        # Check if focus is on Input
         focused = self.focused
         if not isinstance(focused, Input):
-            # Not on Input, let Textual handle BINDINGS normally
             return
 
-        # Special handling: autocomplete and history navigation for shared-input
         if focused.id == "shared-input":
             autocomplete = self.query_one("#autocomplete", CommandAutocomplete)
 
-            # Ctrl+U: Clear line (like bash/zsh)
             if event.key == "ctrl+u":
                 focused.value = ""
                 self.browsing_history = False
@@ -751,8 +743,6 @@ class AWSUIApp(App):
                 event.prevent_default()
                 event.stop()
                 return
-
-            # Smart decision: determine ↑↓ behavior based on state
 
             # Case 1: Browsing history → ↑↓ continues history navigation
             if self.browsing_history:
@@ -766,7 +756,6 @@ class AWSUIApp(App):
                     event.prevent_default()
                     event.stop()
                     return
-                # Exit history mode on other keys (except up/down)
                 elif event.key not in ["up", "down"]:
                     self.browsing_history = False
 
@@ -784,7 +773,7 @@ class AWSUIApp(App):
                     event.stop()
                     return
 
-            # Case 3: Input has content + autocomplete visible → ↑↓ for autocomplete
+            # Case 3: Input has content + autocomplete visible → ↑↓ for autocomplete, Tab/Enter to select
             elif autocomplete.display:
                 if event.key == "up":
                     autocomplete.move_cursor_up()
@@ -796,20 +785,41 @@ class AWSUIApp(App):
                     event.prevent_default()
                     event.stop()
                     return
-                elif event.key == "enter":
-                    # If command is selected, fill it in and close
+                elif event.key == "tab":
                     selected = autocomplete.get_selected_command()
                     if selected:
-                        focused.value = selected
-                        focused.action_end()
+                        current_value = focused.value
+                        cursor_pos = focused.cursor_position
+
+                        new_value, new_cursor_pos = autocomplete.smart_insert_selection(
+                            current_value, cursor_pos, selected
+                        )
+
+                        focused.value = new_value
+                        focused.cursor_position = new_cursor_pos
                         autocomplete.display = False
                         autocomplete.clear_options()
                         event.prevent_default()
                         event.stop()
                         return
-                    # Otherwise let Enter execute command normally (don't prevent)
+                elif event.key == "enter":
+                    selected = autocomplete.get_selected_command()
+                    if selected:
+                        current_value = focused.value
+                        cursor_pos = focused.cursor_position
+
+                        new_value, new_cursor_pos = autocomplete.smart_insert_selection(
+                            current_value, cursor_pos, selected
+                        )
+
+                        focused.value = new_value
+                        focused.cursor_position = new_cursor_pos
+                        autocomplete.display = False
+                        autocomplete.clear_options()
+                        event.prevent_default()
+                        event.stop()
+                        return
                 elif event.key == "escape":
-                    # If autocomplete is visible, close it first
                     autocomplete.display = False
                     autocomplete.clear_options()
                     event.prevent_default()
@@ -829,7 +839,6 @@ class AWSUIApp(App):
                     event.stop()
                     return
 
-        # Escape: Exit current input and return to profile list
         if event.key == "escape":
             profile_list = self.query_one("#profile-list", ProfileList)
             profile_list.focus()
@@ -837,7 +846,6 @@ class AWSUIApp(App):
             event.stop()
             return
 
-        # Global shortcuts when in Input
         if event.key == "q":
             self.action_quit()
             event.prevent_default()
@@ -850,7 +858,6 @@ class AWSUIApp(App):
             event.stop()
             return
 
-        # Ctrl key combinations
         if event.key == "ctrl+l":
             self.action_clear_cli()
             event.prevent_default()
@@ -865,28 +872,23 @@ class AWSUIApp(App):
         elif event.input.id == "shared-input":
             autocomplete = self.query_one("#autocomplete", CommandAutocomplete)
 
-            # If browsing history, don't trigger autocomplete
             if self.browsing_history:
-                # Check if user manually modified the history content
                 if self.history_index != -1 and self.history_index < len(
                     self.command_history
                 ):
                     expected_value = self.command_history[self.history_index]
                     if event.value != expected_value:
-                        # User modified the content, exit history mode
                         self.browsing_history = False
                         self.history_index = -1
                         self.current_input = ""
-                        # Now trigger autocomplete
-                        autocomplete.filter_commands(event.value)
-                # Don't trigger autocomplete while browsing history
+                        cursor_pos = event.input.cursor_position
+                        autocomplete.filter_commands(event.value, cursor_pos)
                 return
 
-            # Normal mode: trigger autocomplete (only in CLI mode)
             if self.active_tab == "cli":
-                autocomplete.filter_commands(event.value)
+                cursor_pos = event.input.cursor_position
+                autocomplete.filter_commands(event.value, cursor_pos)
             else:
-                # AI mode: no autocomplete
                 autocomplete.display = False
 
     def on_input_submitted(self, event: Input.Submitted):
@@ -920,14 +922,13 @@ class AWSUIApp(App):
                 )
 
         elif event.input.id == "shared-input":
-            # Execute command based on active tab
             value = event.value.strip()
             if value:
                 if self.active_tab == "cli":
                     self.execute_aws_command(value)
                 elif self.active_tab == "ai":
                     self.execute_q_query(value)
-                event.input.value = ""  # Clear input after execution
+                event.input.value = ""
 
     def on_list_view_selected(self, event: ListView.Selected):
         """Handle profile selection."""
@@ -958,7 +959,6 @@ class AWSUIApp(App):
             left_pane = self.query_one("#left-pane", Vertical)
             left_pane.display = show
 
-            # Toggle fullscreen CSS class on Screen
             if show:
                 self.screen.remove_class("fullscreen")
                 self.notify(self.lang["left_pane_shown"])
@@ -966,7 +966,6 @@ class AWSUIApp(App):
                 self.screen.add_class("fullscreen")
                 self.notify(self.lang["cli_fullscreen"])
         except Exception:
-            # During initialization, widgets may not exist yet
             pass
 
     def action_toggle_ai_panel(self):
