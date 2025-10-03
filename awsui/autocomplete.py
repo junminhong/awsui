@@ -228,7 +228,6 @@ class CommandAutocomplete(OptionList):
         Returns:
             Tuple of (new_value, new_cursor_position)
         """
-        # If selection is a full command (starts with "aws "), replace entire input
         if selection.startswith("aws "):
             return (selection, len(selection))
 
@@ -239,12 +238,10 @@ class CommandAutocomplete(OptionList):
         token_start = cursor_pos - len(parsed.current_token)
 
         # Find where the current token actually ends (could be beyond cursor)
-        # The token ends at the next whitespace or end of string
         token_end = cursor_pos
         while token_end < len(current_value) and not current_value[token_end].isspace():
             token_end += 1
 
-        # Get text after the complete token
         text_after_token = current_value[token_end:]
 
         if parsed.current_context in (
