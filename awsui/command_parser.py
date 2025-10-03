@@ -4,6 +4,8 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
+from .service_model_loader import get_service_loader
+
 
 class CompletionContext(Enum):
     """Context for autocomplete suggestions."""
@@ -31,9 +33,18 @@ class ParsedCommand:
 
 
 class AWSCommandParser:
-    """Parser for AWS CLI commands to enable context-aware autocomplete."""
+    """Parser for AWS CLI commands to enable context-aware autocomplete.
 
-    AWS_SERVICES = [
+    Uses a hybrid approach:
+    - Fast path: Hardcoded common services and commands
+    - Fallback: Dynamic loading from botocore for all AWS services
+    """
+
+    # Special AWS CLI commands (not services)
+    SPECIAL_COMMANDS = ["help", "configure"]
+
+    # Hardcoded common services for fast completion
+    COMMON_SERVICES = [
         "s3", "ec2", "lambda", "dynamodb", "rds", "iam", "sts", "cloudformation",
         "cloudfront", "cloudtrail", "cloudwatch", "logs", "ecr", "ecs", "eks",
         "sns", "sqs", "secretsmanager", "ssm", "stepfunctions", "kinesis", "kms",
@@ -57,6 +68,25 @@ class AWSCommandParser:
         "logs": ["tail", "describe-log-groups", "describe-log-streams"],
         "cloudwatch": ["list-metrics", "get-metric-statistics", "describe-alarms"],
     }
+
+    # Global parameters that can be used anywhere in AWS CLI
+    GLOBAL_PARAMETERS = [
+        "--version",
+        "--debug",
+        "--no-verify-ssl",
+        "--no-paginate",
+        "--output",
+        "--query",
+        "--profile",
+        "--region",
+        "--endpoint-url",
+        "--no-cli-pager",
+        "--color",
+        "--no-sign-request",
+        "--ca-bundle",
+        "--cli-read-timeout",
+        "--cli-connect-timeout",
+    ]
 
     COMMON_PARAMETERS = [
         "--region",
@@ -90,6 +120,11 @@ class AWSCommandParser:
         "cloudformation": ["--stack-name", "--template-body", "--template-url", "--parameters"],
         "dynamodb": ["--table-name", "--key", "--attribute-definitions", "--provisioned-throughput"],
     }
+
+    def __init__(self):
+        """Initialize parser with optional dynamic service loader."""
+        self.service_loader = get_service_loader()
+        self.use_dynamic_loading = self.service_loader.is_available()
 
     def parse(self, command_line: str, cursor_pos: int | None = None) -> ParsedCommand:
         """
@@ -130,7 +165,8 @@ class AWSCommandParser:
 
         if len(tokens) >= 1:
             potential_service = tokens[0]
-            if potential_service in self.AWS_SERVICES:
+            # Check if it's a valid service (hardcoded or dynamic)
+            if self._is_valid_service(potential_service):
                 parsed.service = potential_service
             elif not potential_service.startswith("-"):
                 parsed.current_context = CompletionContext.SERVICE
@@ -172,12 +208,18 @@ class AWSCommandParser:
             if expecting_value:
                 parsed.current_context = CompletionContext.PARAMETER_VALUE
                 parsed.current_token = current_token if not is_completing_new else ""
-            elif parsed.command or (parsed.service and len(tokens) > 1):
+            elif parsed.service and parsed.command and is_completing_new:
+                # Has complete service and command, now expecting parameters
                 parsed.current_context = CompletionContext.PARAMETER
-                parsed.current_token = current_token if not is_completing_new else ""
-            elif parsed.service:
+                parsed.current_token = ""
+            elif parsed.service and not is_completing_new:
+                # Has service, currently typing command
                 parsed.current_context = CompletionContext.COMMAND
-                parsed.current_token = current_token if not is_completing_new else ""
+                parsed.current_token = current_token
+            elif parsed.service:
+                # Has service with trailing space, expecting command
+                parsed.current_context = CompletionContext.COMMAND
+                parsed.current_token = ""
             else:
                 parsed.current_context = CompletionContext.SERVICE
                 parsed.current_token = current_token if not is_completing_new else ""
@@ -218,9 +260,58 @@ class AWSCommandParser:
 
         return tokens
 
+    def _is_valid_service(self, service: str) -> bool:
+        """Check if service is valid (hardcoded or from botocore)."""
+        # Special commands (help, configure) are treated as "services" for parsing
+        if service in self.SPECIAL_COMMANDS:
+            return True
+        if service in self.COMMON_SERVICES:
+            return True
+        if self.use_dynamic_loading:
+            return service in self.service_loader.get_all_services()
+        return False
+
+    def _get_all_services(self) -> list[str]:
+        """Get all available services (hybrid: hardcoded + dynamic)."""
+        services = set(self.COMMON_SERVICES)
+        if self.use_dynamic_loading:
+            services.update(self.service_loader.get_all_services())
+        return sorted(services)
+
+    def _get_service_commands(self, service: str) -> list[str]:
+        """Get commands for a service (hybrid: dynamic preferred, hardcoded fallback)."""
+        # Prefer dynamic loading (more complete)
+        if self.use_dynamic_loading:
+            commands = self.service_loader.get_service_operations(service)
+            if commands:
+                return commands
+
+        # Fallback to hardcoded (fast but limited)
+        if service in self.SERVICE_COMMANDS:
+            return self.SERVICE_COMMANDS[service]
+
+        return []
+
+    def _get_command_parameters(self, service: str, command: str) -> list[str]:
+        """Get parameters for a command (hybrid: common + service-specific + dynamic)."""
+        suggestions = list(self.COMMON_PARAMETERS)
+
+        # Add hardcoded service-specific parameters
+        if service in self.SERVICE_PARAMETERS:
+            suggestions.extend(self.SERVICE_PARAMETERS[service])
+
+        # Add dynamic parameters from botocore
+        if self.use_dynamic_loading:
+            dynamic_params = self.service_loader.get_operation_parameters(service, command)
+            suggestions.extend(dynamic_params)
+
+        return list(set(suggestions))  # Remove duplicates
+
     def get_suggestions(self, parsed: ParsedCommand) -> list[str]:
         """
         Get autocomplete suggestions based on parsed command context.
+
+        Uses hybrid approach: hardcoded (fast) + dynamic (complete).
 
         Args:
             parsed: Parsed command structure
@@ -231,17 +322,36 @@ class AWSCommandParser:
         query = parsed.current_token.lower()
 
         if parsed.current_context == CompletionContext.SERVICE:
-            return [s for s in self.AWS_SERVICES if s.startswith(query)]
+            all_services = self._get_all_services()
+            services = [s for s in all_services if s.startswith(query)]
+
+            # Include special commands (help, configure)
+            special_cmds = [c for c in self.SPECIAL_COMMANDS if c.startswith(query)]
+
+            # Also include global parameters if query starts with "-"
+            if query.startswith("-"):
+                global_params = [p for p in self.GLOBAL_PARAMETERS if p.startswith(query)]
+                return global_params + special_cmds + services
+
+            return special_cmds + services
 
         elif parsed.current_context == CompletionContext.COMMAND:
-            commands = self.SERVICE_COMMANDS.get(parsed.service, [])
+            # Special commands (help, configure) don't have subcommands
+            if parsed.service in self.SPECIAL_COMMANDS:
+                return []
+            commands = self._get_service_commands(parsed.service)
             return [c for c in commands if c.startswith(query)]
 
         elif parsed.current_context == CompletionContext.PARAMETER:
-            suggestions = list(self.COMMON_PARAMETERS)
+            # Special commands (help, configure) don't accept parameters
+            if parsed.service in self.SPECIAL_COMMANDS:
+                return []
 
-            if parsed.service in self.SERVICE_PARAMETERS:
-                suggestions.extend(self.SERVICE_PARAMETERS[parsed.service])
+            # If no service yet, show global parameters
+            if not parsed.service:
+                return [p for p in self.GLOBAL_PARAMETERS if p.startswith(query)]
+
+            suggestions = self._get_command_parameters(parsed.service, parsed.command)
 
             used_params = set(parsed.parameters.keys())
             suggestions = [p for p in suggestions if p not in used_params]

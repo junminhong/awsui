@@ -510,6 +510,7 @@ class AWSUIApp(App):
         self.history_index: int = -1
         self.current_input: str = ""
         self.browsing_history: bool = False
+        self._autocomplete_handled_enter: bool = False
 
         self.auth_worker: Worker | None = None
         self.auth_worker_active: bool = False
@@ -816,6 +817,7 @@ class AWSUIApp(App):
                         focused.cursor_position = new_cursor_pos
                         autocomplete.display = False
                         autocomplete.clear_options()
+                        self._autocomplete_handled_enter = True
                         event.prevent_default()
                         event.stop()
                         return
@@ -922,6 +924,12 @@ class AWSUIApp(App):
                 )
 
         elif event.input.id == "shared-input":
+            # Check if autocomplete just handled this Enter key
+            # (the flag is set in on_key before this event fires)
+            if self._autocomplete_handled_enter:
+                self._autocomplete_handled_enter = False
+                return
+
             value = event.value.strip()
             if value:
                 if self.active_tab == "cli":

@@ -95,7 +95,7 @@ class CommandAutocomplete(OptionList):
             self.clear_options()
             return
 
-        if self.use_intelligent_autocomplete and query.strip().startswith("aws "):
+        if self.use_intelligent_autocomplete and query.startswith("aws "):
             self._intelligent_filter(query, cursor_pos)
         else:
             self._fuzzy_filter(query)
@@ -228,12 +228,24 @@ class CommandAutocomplete(OptionList):
         Returns:
             Tuple of (new_value, new_cursor_position)
         """
+        # If selection is a full command (starts with "aws "), replace entire input
+        if selection.startswith("aws "):
+            return (selection, len(selection))
+
         if not self.use_intelligent_autocomplete or not current_value.strip().startswith("aws "):
             return (selection, len(selection))
 
         parsed = self.parser.parse(current_value, cursor_pos)
-        text_after_cursor = current_value[cursor_pos:]
         token_start = cursor_pos - len(parsed.current_token)
+
+        # Find where the current token actually ends (could be beyond cursor)
+        # The token ends at the next whitespace or end of string
+        token_end = cursor_pos
+        while token_end < len(current_value) and not current_value[token_end].isspace():
+            token_end += 1
+
+        # Get text after the complete token
+        text_after_token = current_value[token_end:]
 
         if parsed.current_context in (
             CompletionContext.SERVICE,
@@ -245,7 +257,7 @@ class CommandAutocomplete(OptionList):
                 current_value[:token_start] +
                 selection +
                 " " +
-                text_after_cursor.lstrip()
+                text_after_token.lstrip()
             )
             new_cursor = token_start + len(selection) + 1
         else:
@@ -254,7 +266,7 @@ class CommandAutocomplete(OptionList):
                     current_value[:token_start] +
                     selection +
                     " " +
-                    text_after_cursor.lstrip()
+                    text_after_token.lstrip()
                 )
                 new_cursor = token_start + len(selection) + 1
             else:
