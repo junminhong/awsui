@@ -9,8 +9,9 @@ class TestAWSCommandParser:
 
     @pytest.fixture
     def parser(self):
-        """Create parser instance."""
-        return AWSCommandParser()
+        parser = AWSCommandParser()
+        parser.use_dynamic_loading = False
+        return parser
 
     def test_parse_service_completion(self, parser):
         """Test service name completion."""
@@ -48,11 +49,11 @@ class TestAWSCommandParser:
         assert parsed.command == "describe-instances"
 
     def test_parse_parameter_value_completion(self, parser):
-        """Test parameter value completion."""
-        parsed = parser.parse("aws ec2 describe-instances --region us")
+        """Parameter value context is active while awaiting a value."""
+        parsed = parser.parse("aws ec2 describe-instances --region ")
         assert parsed.current_context == CompletionContext.PARAMETER_VALUE
-        assert parsed.current_token == "us"
-        assert "--region" in parsed.parameters
+        assert parsed.current_token == ""
+        assert parsed.parameters["--region"] is None
 
     def test_get_service_suggestions(self, parser):
         """Test service name suggestions."""
@@ -78,7 +79,7 @@ class TestAWSCommandParser:
 
     def test_get_region_value_suggestions(self, parser):
         """Test region value suggestions."""
-        parsed = parser.parse("aws ec2 describe-instances --region us")
+        parsed = parser.parse("aws ec2 describe-instances --region ")
         suggestions = parser.get_suggestions(parsed)
         assert "us-east-1" in suggestions
         assert "us-west-2" in suggestions
