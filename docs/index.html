@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="awsui - A powerful, user-friendly terminal interface for AWS Profile and SSO management. Built with Textual for a modern, responsive TUI experience."
+    />
+    <meta
+      name="keywords"
+      content="aws, cli, tui, profile, sso, textual, terminal, aws-cli, python"
+    />
+    <meta name="author" content="junminhong (jasper)" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://junminhong.github.io/awsui/" />
+    <meta
+      property="og:title"
+      content="awsui - AWS Profile & SSO Management TUI"
+    />
+    <meta
+      property="og:description"
+      content="A powerful, user-friendly terminal interface for AWS Profile and SSO management."
+    />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta
+      property="twitter:url"
+      content="https://junminhong.github.io/awsui/"
+    />
+    <meta
+      property="twitter:title"
+      content="awsui - AWS Profile & SSO Management TUI"
+    />
+    <meta
+      property="twitter:description"
+      content="A powerful, user-friendly terminal interface for AWS Profile and SSO management."
+    />
+
+    <title>awsui - AWS Profile & SSO Management TUI</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" type="image/png" href="images/logo02.png" />
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="container">
+        <div class="nav-brand">
+          <img src="images/logo02.png" alt="awsui logo" class="logo-small" />
+          <span class="brand-name">awsui</span>
+        </div>
+        <button
+          class="nav-toggle"
+          id="navToggle"
+          aria-label="Toggle navigation"
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <ul class="nav-menu" id="navMenu">
+          <li><a href="#features">Features</a></li>
+          <li><a href="#demo">Demo</a></li>
+          <li><a href="#quickstart">Quick Start</a></li>
+          <li><a href="#docs">Docs</a></li>
+          <li>
+            <a
+              href="https://github.com/junminhong/awsui"
+              target="_blank"
+              rel="noopener"
+              >GitHub</a
+            >
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="container">
+        <div class="hero-content">
+          <img src="images/logo01.png" alt="awsui logo" class="hero-logo" />
+          <h1>awsui</h1>
+          <p class="hero-subtitle">
+            A powerful, user-friendly terminal interface for AWS Profile and SSO
+            management
+          </p>
+          <p class="hero-tagline">
+            Built with
+            <a
+              href="https://textual.textualize.io/"
+              target="_blank"
+              rel="noopener"
+              >Textual</a
+            >
+            for a modern, responsive TUI experience
+          </p>
+
+          <div class="hero-badges">
+            <a
+              href="https://pypi.org/project/awsui/"
+              target="_blank"
+              rel="noopener"
+            >
+              <img
+                src="https://img.shields.io/pypi/v/awsui?color=blue"
+                alt="PyPI version"
+              />
+            </a>
+            <a
+              href="https://pypi.org/project/awsui/"
+              target="_blank"
+              rel="noopener"
+            >
+              <img
+                src="https://img.shields.io/pypi/pyversions/awsui"
+                alt="Python versions"
+              />
+            </a>
+            <a
+              href="https://pypi.org/project/awsui/"
+              target="_blank"
+              rel="noopener"
+            >
+              <img src="https://img.shields.io/pypi/dw/awsui" alt="Downloads" />
+            </a>
+            <a
+              href="https://opensource.org/licenses/MIT"
+              target="_blank"
+              rel="noopener"
+            >
+              <img
+                src="https://img.shields.io/badge/License-MIT-yellow.svg"
+                alt="License: MIT"
+              />
+            </a>
+            <a
+              href="https://github.com/junminhong/awsui"
+              target="_blank"
+              rel="noopener"
+            >
+              <img
+                src="https://img.shields.io/github/stars/junminhong/awsui?style=social"
+                alt="GitHub stars"
+              />
+            </a>
+          </div>
+
+          <div class="hero-highlights">
+            <span class="highlight">⚡ Fast</span>
+            <span class="highlight">🔐 Secure</span>
+            <span class="highlight">🤖 AI-Powered</span>
+            <span class="highlight">🌍 Bilingual</span>
+          </div>
+
+          <div class="hero-cta">
+            <a href="#quickstart" class="btn btn-primary">Get Started</a>
+            <a
+              href="https://github.com/junminhong/awsui"
+              class="btn btn-secondary"
+              target="_blank"
+              rel="noopener"
+              >View on GitHub</a
+            >
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+      <div class="container">
+        <h2 class="section-title">Why awsui?</h2>
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <h3>Lightning Fast</h3>
+            <p>
+              Search and switch between dozens of AWS profiles in milliseconds
+              with real-time fuzzy matching
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🔐</div>
+            <h3>SSO Made Easy</h3>
+            <p>
+              Automatic re-authentication when credentials expire - no manual
+              login headaches
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🤖</div>
+            <h3>AI-Powered Assistant</h3>
+            <p>
+              Integrated Amazon Q Developer CLI for intelligent AWS assistance
+              with streaming responses
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🎯</div>
+            <h3>Smart CLI</h3>
+            <p>
+              Command autocomplete with AWS CLI cheatsheet built-in for 15+
+              services
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🌍</div>
+            <h3>Bilingual Support</h3>
+            <p>Full support for English and Traditional Chinese interfaces</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">📊</div>
+            <h3>Clear Visibility</h3>
+            <p>
+              See profile details, account info, and current identity at a
+              glance
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🎨</div>
+            <h3>Modern UX</h3>
+            <p>
+              Beautiful, keyboard-driven interface that respects your terminal
+              theme
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🔒</div>
+            <h3>Secure by Design</h3>
+            <p>
+              Uses AWS CLI's credential system - no credential storage or
+              caching
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Demo Section -->
+    <section id="demo" class="demo">
+      <div class="container">
+        <h2 class="section-title">See It in Action</h2>
+        <div class="demo-gallery">
+          <div class="demo-item">
+            <img
+              src="images/demo01.png"
+              alt="Profile search and switching"
+              loading="lazy"
+            />
+            <p class="demo-caption">
+              ⚡ Fast profile search and switching with real-time filtering
+            </p>
+          </div>
+          <div class="demo-item">
+            <img
+              src="images/demo02.png"
+              alt="AWS CLI execution"
+              loading="lazy"
+            />
+            <p class="demo-caption">
+              🎯 Smart CLI with command autocomplete and inline execution
+            </p>
+          </div>
+          <div class="demo-item">
+            <img
+              src="images/demo03.png"
+              alt="Amazon Q AI assistant"
+              loading="lazy"
+            />
+            <p class="demo-caption">
+              🤖 AI-powered Amazon Q Developer integration with streaming
+              responses
+            </p>
+          </div>
+          <div class="demo-item">
+            <img
+              src="images/demo04.png"
+              alt="AWS CLI cheatsheet"
+              loading="lazy"
+            />
+            <p class="demo-caption">
+              📚 Built-in AWS CLI cheatsheet with quick reference for 15+
+              services
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Start Section -->
+    <section id="quickstart" class="quickstart">
+      <div class="container">
+        <h2 class="section-title">Quick Start</h2>
+        <div class="quickstart-content">
+          <div class="install-method">
+            <h3>Install with uv (Recommended)</h3>
+            <pre><code># Install as a tool (isolated environment)
+uv tool install --python 3.13 awsui
+
+# Run directly
+awsui</code></pre>
+          </div>
+
+          <div class="install-method">
+            <h3>Install with pip</h3>
+            <pre><code># Install from PyPI
+pip install awsui
+
+# Run
+awsui</code></pre>
+          </div>
+
+          <div class="requirements">
+            <h3>Requirements</h3>
+            <ul>
+              <li><strong>Python:</strong> ≥ 3.13, &lt; 3.14</li>
+              <li><strong>AWS CLI:</strong> v2 (required)</li>
+              <li>
+                <strong>Amazon Q CLI:</strong> Optional, for AI assistance
+              </li>
+              <li>
+                <strong>uv:</strong> Recommended for dependency management
+              </li>
+            </ul>
+          </div>
+
+          <div class="keyboard-shortcuts">
+            <h3>Key Shortcuts</h3>
+            <div class="shortcuts-grid">
+              <div class="shortcut">
+                <kbd>/</kbd>
+                <span>Focus search box</span>
+              </div>
+              <div class="shortcut">
+                <kbd>↑</kbd> <kbd>↓</kbd>
+                <span>Navigate profiles</span>
+              </div>
+              <div class="shortcut">
+                <kbd>Enter</kbd>
+                <span>Apply selected profile</span>
+              </div>
+              <div class="shortcut">
+                <kbd>c</kbd>
+                <span>Focus CLI input</span>
+              </div>
+              <div class="shortcut">
+                <kbd>a</kbd>
+                <span>Toggle AI assistant</span>
+              </div>
+              <div class="shortcut">
+                <kbd>h</kbd>
+                <span>Show cheatsheet</span>
+              </div>
+              <div class="shortcut">
+                <kbd>l</kbd>
+                <span>Force SSO login</span>
+              </div>
+              <div class="shortcut">
+                <kbd>w</kbd>
+                <span>Show current identity</span>
+              </div>
+              <div class="shortcut">
+                <kbd>q</kbd>
+                <span>Quit</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Documentation Section -->
+    <section id="docs" class="docs">
+      <div class="container">
+        <h2 class="section-title">Documentation & Resources</h2>
+        <div class="docs-grid">
+          <a
+            href="https://github.com/junminhong/awsui/blob/main/README.md"
+            class="doc-card"
+            target="_blank"
+            rel="noopener"
+          >
+            <h3>📖 Full Documentation</h3>
+            <p>
+              Complete guide including configuration, usage, and troubleshooting
+            </p>
+          </a>
+          <a
+            href="https://github.com/junminhong/awsui/blob/main/README_ZH_TW.md"
+            class="doc-card"
+            target="_blank"
+            rel="noopener"
+          >
+            <h3>🇹🇼 繁體中文文檔</h3>
+            <p>完整的繁體中文使用說明與疑難排解</p>
+          </a>
+          <a
+            href="https://pypi.org/project/awsui/"
+            class="doc-card"
+            target="_blank"
+            rel="noopener"
+          >
+            <h3>📦 PyPI Package</h3>
+            <p>Download and installation information on Python Package Index</p>
+          </a>
+          <a
+            href="https://github.com/junminhong/awsui/issues"
+            class="doc-card"
+            target="_blank"
+            rel="noopener"
+          >
+            <h3>🐛 Report Issues</h3>
+            <p>Found a bug or have a feature request? Let us know!</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <div class="footer-content">
+          <div class="footer-section">
+            <h4>awsui</h4>
+            <p>Making AWS Profile switching delightful!</p>
+            <p class="footer-tagline">Made with ❤️ for AWS Developers</p>
+          </div>
+          <div class="footer-section">
+            <h4>Links</h4>
+            <ul>
+              <li>
+                <a
+                  href="https://github.com/junminhong/awsui"
+                  target="_blank"
+                  rel="noopener"
+                  >GitHub Repository</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://pypi.org/project/awsui/"
+                  target="_blank"
+                  rel="noopener"
+                  >PyPI Package</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://github.com/junminhong/awsui/issues"
+                  target="_blank"
+                  rel="noopener"
+                  >Issue Tracker</a
+                >
+              </li>
+            </ul>
+          </div>
+          <div class="footer-section">
+            <h4>Built With</h4>
+            <ul>
+              <li>
+                <a
+                  href="https://textual.textualize.io/"
+                  target="_blank"
+                  rel="noopener"
+                  >Textual</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://docs.astral.sh/uv/"
+                  target="_blank"
+                  rel="noopener"
+                  >uv</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://aws.amazon.com/cli/"
+                  target="_blank"
+                  rel="noopener"
+                  >AWS CLI</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://aws.amazon.com/q/developer/"
+                  target="_blank"
+                  rel="noopener"
+                  >Amazon Q Developer</a
+                >
+              </li>
+            </ul>
+          </div>
+          <div class="footer-section">
+            <h4>Resources</h4>
+            <ul>
+              <li>
+                <a
+                  href="https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html"
+                  target="_blank"
+                  rel="noopener"
+                  >AWS CLI SSO Configuration</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line.html"
+                  target="_blank"
+                  rel="noopener"
+                  >Amazon Q Developer CLI</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://textual.textualize.io/"
+                  target="_blank"
+                  rel="noopener"
+                  >Textual Documentation</a
+                >
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <p>
+            &copy; 2025 junminhong (jasper). Licensed under the
+            <a
+              href="https://opensource.org/licenses/MIT"
+              target="_blank"
+              rel="noopener"
+              >MIT License</a
+            >.
+          </p>
+        </div>
+      </div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
