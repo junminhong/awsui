@@ -34,7 +34,7 @@ def test_filter_commands_with_trailing_space(autocomplete):
 def test_filter_commands_without_strip(autocomplete):
     """Test filter_commands doesn't strip query before checking startswith."""
     autocomplete.filter_commands("aws ", 4)
-    # Should use intelligent filter, not fuzzy
+    # Should display autocomplete suggestions using intelligent filtering based on AWS CLI context
     assert autocomplete.display is True
 
 
@@ -84,24 +84,24 @@ def test_smart_insert_replaces_partial_token(autocomplete):
 def test_smart_insert_cursor_in_middle_of_token(autocomplete):
     """Test smart_insert with cursor in middle of token."""
     current_value = "aws ec2 describe --instance-ids i-123"
-    cursor_pos = 15  # In middle of "describe"
+    cursor_pos = 15  # Cursor position is in the middle of "describe" token
     selection = "describe-instances"
 
     new_value, new_cursor = autocomplete.smart_insert_selection(
         current_value, cursor_pos, selection
     )
 
-    # Should replace entire "describe" token
+    # Verify that the entire "describe" token is replaced with "describe-instances"
     assert "describe-instances" in new_value
     assert "describe" not in new_value or "describe-instances" in new_value
-    # Parameters should be preserved
+    # Verify that parameters after the token are preserved
     assert "--instance-ids i-123" in new_value
 
 
 def test_smart_insert_preserves_text_after_token(autocomplete):
     """Test smart_insert preserves text after current token."""
     current_value = "aws s3 ls --region us-east-1"
-    cursor_pos = 8  # After "ls"
+    cursor_pos = 8  # Cursor position is right after "ls" command
     selection = "cp"
 
     new_value, new_cursor = autocomplete.smart_insert_selection(
@@ -129,7 +129,7 @@ def test_intelligent_filter_calls_parser(autocomplete):
     """Test intelligent filter uses parser for suggestions."""
     autocomplete.filter_commands("aws s3 ", 7)
     assert autocomplete.display is True
-    # Should show s3 commands
+    # Verify that S3-related commands are shown in filtered results
     assert len(autocomplete.filtered_commands) > 0
 
 

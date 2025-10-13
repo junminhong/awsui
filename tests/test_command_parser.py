@@ -49,7 +49,7 @@ class TestAWSCommandParser:
         assert parsed.command == "describe-instances"
 
     def test_parse_parameter_value_completion(self, parser):
-        """Parameter value context is active while awaiting a value."""
+        """Test that parameter value context is active when awaiting a value after a parameter flag."""
         parsed = parser.parse("aws ec2 describe-instances --region ")
         assert parsed.current_context == CompletionContext.PARAMETER_VALUE
         assert parsed.current_token == ""

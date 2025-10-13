@@ -31,7 +31,7 @@ def test_get_service_operations_reads_model(tmp_path):
     operations = loader.get_service_operations("ec2")
     assert operations == ["describe-instances", "start-instances"]
 
-    # Removing the file should not break cached result on subsequent calls
+    # Verify that the cache works: removing the source file should not affect cached results
     service_file.unlink()
     assert loader.get_service_operations("ec2") == operations
 
