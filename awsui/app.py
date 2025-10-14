@@ -1,6 +1,5 @@
 """Main Textual application and entry point."""
 
-import sys
 import os
 import subprocess
 from argparse import ArgumentParser
@@ -35,7 +34,6 @@ from .logging import get_logger
 from .autocomplete import CommandAutocomplete
 from .q_assistant import (
     check_q_cli_available,
-    query_q_cli,
     stream_q_cli_query,
     clean_ansi_codes,
     format_aws_context,
@@ -614,7 +612,9 @@ class AWSUIApp(App):
     def update_status(self, message: str, error: bool = False):
         """Display status notification."""
         if error:
-            self.notify(message, severity="error", title=self.lang.get("error_title", "Error"))
+            self.notify(
+                message, severity="error", title=self.lang.get("error_title", "Error")
+            )
         else:
             self.notify(message, severity="information")
 
@@ -919,9 +919,7 @@ class AWSUIApp(App):
                         )
                     )
             else:
-                self.notify(
-                    self.lang["search_no_results"], severity="warning"
-                )
+                self.notify(self.lang["search_no_results"], severity="warning")
 
         elif event.input.id == "shared-input":
             # Check if autocomplete just handled this Enter key
@@ -1149,9 +1147,7 @@ class AWSUIApp(App):
                         renderables.append(self.build_identity_detail(identity))
 
                     detail_content.update(
-                        Group(*renderables)
-                        if len(renderables) > 1
-                        else renderables[0]
+                        Group(*renderables) if len(renderables) > 1 else renderables[0]
                     )
             else:
                 self.logger.error(
@@ -1260,6 +1256,7 @@ class AWSUIApp(App):
 
     def action_region_override(self):
         """Show region override dialog."""
+
         def handle_region_result(result: str | None) -> None:
             """Handle the result from region input screen."""
             if result is not None:
@@ -1270,12 +1267,16 @@ class AWSUIApp(App):
                 else:
                     # Set new override
                     self.override_region = result
-                    self.update_status(self.lang["region_override_set"].format(region=result))
+                    self.update_status(
+                        self.lang["region_override_set"].format(region=result)
+                    )
 
                 # Update detail pane if a profile is selected
                 if self.selected_profile:
                     detail_content = self.query_one("#detail-content", Static)
-                    detail_content.update(self.build_profile_detail(self.selected_profile))
+                    detail_content.update(
+                        self.build_profile_detail(self.selected_profile)
+                    )
 
         self.push_screen(RegionInputScreen(), handle_region_result)
 
@@ -1481,7 +1482,9 @@ class AWSUIApp(App):
                 self.call_from_thread(
                     self.update_status, self.lang["ai_query_failed"], error=True
                 )
-                self.logger.error("q_query_failed", query=query, duration_ms=duration_ms)
+                self.logger.error(
+                    "q_query_failed", query=query, duration_ms=duration_ms
+                )
                 return
 
             # Stream output line by line
@@ -1491,10 +1494,12 @@ class AWSUIApp(App):
             try:
                 for line in process.stdout:
                     if line:
-                        clean_line = clean_ansi_codes(line.rstrip('\n'))
+                        clean_line = clean_ansi_codes(line.rstrip("\n"))
                         output_lines.append(clean_line)
                         # Display line immediately
-                        self.call_from_thread(output_area.write, f"[green]{clean_line}[/green]\n")
+                        self.call_from_thread(
+                            output_area.write, f"[green]{clean_line}[/green]\n"
+                        )
 
                 # Wait for process to complete
                 process.wait()
@@ -1559,7 +1564,10 @@ class AWSUIApp(App):
             )
             response_text = "\n".join(output_lines) if output_lines else "Unknown error"
             self.logger.error(
-                "q_query_failed", query=query, duration_ms=duration_ms, error=response_text
+                "q_query_failed",
+                query=query,
+                duration_ms=duration_ms,
+                error=response_text,
             )
 
     def action_show_cheatsheet(self):

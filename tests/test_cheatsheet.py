@@ -1,6 +1,5 @@
 """Tests for AWS CLI cheatsheet data structure."""
 
-import pytest
 
 from awsui.cheatsheet import (
     AWS_CLI_CHEATSHEET,

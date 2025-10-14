@@ -5,7 +5,7 @@ from textual.widgets.option_list import Option
 from textual.message import Message
 
 from .command_parser import AWSCommandParser, CompletionContext
-from .parameter_metadata import get_parameter_metadata, format_parameter_help
+from .parameter_metadata import get_parameter_metadata
 from .resource_suggester import ResourceSuggester
 
 
@@ -19,7 +19,9 @@ class CommandAutocomplete(OptionList):
             self.command = command
             super().__init__()
 
-    def __init__(self, commands: list[str], command_categories: dict[str, str], *args, **kwargs):
+    def __init__(
+        self, commands: list[str], command_categories: dict[str, str], *args, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.all_commands = commands
         self.command_categories = command_categories
@@ -105,8 +107,12 @@ class CommandAutocomplete(OptionList):
         parsed = self.parser.parse(query, cursor_pos)
         suggestions = self.parser.get_suggestions(parsed)
 
-        if (parsed.current_context == CompletionContext.PARAMETER_VALUE and
-                self.resource_suggester and parsed.service and parsed.command):
+        if (
+            parsed.current_context == CompletionContext.PARAMETER_VALUE
+            and self.resource_suggester
+            and parsed.service
+            and parsed.command
+        ):
             last_param = None
             for param, value in reversed(list(parsed.parameters.items())):
                 if value is None:
@@ -114,14 +120,15 @@ class CommandAutocomplete(OptionList):
                     break
 
             if last_param:
-                resource_suggestions = self.resource_suggester.get_suggestions_for_parameter(
-                    parsed.service, parsed.command, last_param
+                resource_suggestions = (
+                    self.resource_suggester.get_suggestions_for_parameter(
+                        parsed.service, parsed.command, last_param
+                    )
                 )
                 if resource_suggestions:
                     query_lower = parsed.current_token.lower()
                     filtered_resources = [
-                        r for r in resource_suggestions
-                        if query_lower in r.lower()
+                        r for r in resource_suggestions if query_lower in r.lower()
                     ]
                     if filtered_resources:
                         suggestions = filtered_resources[:10]
@@ -197,14 +204,18 @@ class CommandAutocomplete(OptionList):
 
     def get_selected_command(self) -> str | None:
         """Get currently highlighted command."""
-        if self.highlighted is not None and 0 <= self.highlighted < len(self.filtered_commands):
+        if self.highlighted is not None and 0 <= self.highlighted < len(
+            self.filtered_commands
+        ):
             return self.filtered_commands[self.highlighted]
         return None
 
     def move_cursor_down(self) -> None:
         """Move selection down."""
         if self.filtered_commands and self.highlighted is not None:
-            self.highlighted = min(self.highlighted + 1, len(self.filtered_commands) - 1)
+            self.highlighted = min(
+                self.highlighted + 1, len(self.filtered_commands) - 1
+            )
 
     def move_cursor_up(self) -> None:
         """Move selection up."""
@@ -231,7 +242,10 @@ class CommandAutocomplete(OptionList):
         if selection.startswith("aws "):
             return (selection, len(selection))
 
-        if not self.use_intelligent_autocomplete or not current_value.strip().startswith("aws "):
+        if (
+            not self.use_intelligent_autocomplete
+            or not current_value.strip().startswith("aws ")
+        ):
             return (selection, len(selection))
 
         parsed = self.parser.parse(current_value, cursor_pos)
@@ -251,19 +265,19 @@ class CommandAutocomplete(OptionList):
             CompletionContext.PARAMETER_VALUE,
         ):
             new_value = (
-                current_value[:token_start] +
-                selection +
-                " " +
-                text_after_token.lstrip()
+                current_value[:token_start]
+                + selection
+                + " "
+                + text_after_token.lstrip()
             )
             new_cursor = token_start + len(selection) + 1
         else:
             if parsed.current_token:
                 new_value = (
-                    current_value[:token_start] +
-                    selection +
-                    " " +
-                    text_after_token.lstrip()
+                    current_value[:token_start]
+                    + selection
+                    + " "
+                    + text_after_token.lstrip()
                 )
                 new_cursor = token_start + len(selection) + 1
             else:

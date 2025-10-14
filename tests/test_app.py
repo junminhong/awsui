@@ -1,14 +1,12 @@
 """Tests for app.py business logic."""
 
 import sys
-from unittest.mock import Mock, patch, MagicMock
-from io import StringIO
+from unittest.mock import Mock, patch
 
 import pytest
 
 from awsui.app import (
     parse_args,
-    ProfileList,
     AWSUIApp,
 )
 from awsui.models import Profile
@@ -300,7 +298,7 @@ class TestAWSUIAppInitialization:
     def test_initialization_with_log_level(self):
         """Test app initialization with custom log level."""
         with patch("awsui.app.get_logger") as mock_logger:
-            app = AWSUIApp(log_level="DEBUG")
+            AWSUIApp(log_level="DEBUG")
             mock_logger.assert_called_once_with("DEBUG")
 
     def test_initialization_sets_subtitle(self):

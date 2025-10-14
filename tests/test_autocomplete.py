@@ -2,7 +2,6 @@
 
 import pytest
 from awsui.autocomplete import CommandAutocomplete
-from awsui.command_parser import CompletionContext
 
 
 @pytest.fixture

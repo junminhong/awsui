@@ -5,6 +5,7 @@ from typing import TypedDict, Literal
 
 class Profile(TypedDict):
     """AWS Profile representation."""
+
     name: str
     kind: Literal["sso", "assume", "basic"]
     account: str | None

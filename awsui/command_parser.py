@@ -1,6 +1,5 @@
 """AWS CLI command parser for intelligent autocomplete."""
 
-import re
 from dataclasses import dataclass
 from enum import Enum
 
@@ -9,15 +8,17 @@ from .service_model_loader import get_service_loader
 
 class CompletionContext(Enum):
     """Context for autocomplete suggestions."""
-    SERVICE = "service"           # Completing AWS service name (e.g., "aws s3")
-    COMMAND = "command"           # Completing command (e.g., "aws s3 ls")
-    PARAMETER = "parameter"       # Completing parameter name (e.g., "--region")
-    PARAMETER_VALUE = "value"     # Completing parameter value (e.g., "--region us-")
+
+    SERVICE = "service"  # Completing AWS service name (e.g., "aws s3")
+    COMMAND = "command"  # Completing command (e.g., "aws s3 ls")
+    PARAMETER = "parameter"  # Completing parameter name (e.g., "--region")
+    PARAMETER_VALUE = "value"  # Completing parameter value (e.g., "--region us-")
 
 
 @dataclass
 class ParsedCommand:
     """Parsed AWS CLI command structure."""
+
     raw_input: str
     service: str = ""
     command: str = ""
@@ -43,24 +44,82 @@ class AWSCommandParser:
     SPECIAL_COMMANDS = ["help", "configure"]
 
     COMMON_SERVICES = [
-        "s3", "ec2", "lambda", "dynamodb", "rds", "iam", "sts", "cloudformation",
-        "cloudfront", "cloudtrail", "cloudwatch", "logs", "ecr", "ecs", "eks",
-        "sns", "sqs", "secretsmanager", "ssm", "stepfunctions", "kinesis", "kms",
-        "glue", "organizations", "route53", "redshift"
+        "s3",
+        "ec2",
+        "lambda",
+        "dynamodb",
+        "rds",
+        "iam",
+        "sts",
+        "cloudformation",
+        "cloudfront",
+        "cloudtrail",
+        "cloudwatch",
+        "logs",
+        "ecr",
+        "ecs",
+        "eks",
+        "sns",
+        "sqs",
+        "secretsmanager",
+        "ssm",
+        "stepfunctions",
+        "kinesis",
+        "kms",
+        "glue",
+        "organizations",
+        "route53",
+        "redshift",
     ]
 
     SERVICE_COMMANDS = {
         "s3": ["ls", "cp", "mv", "rm", "sync", "mb", "rb"],
-        "ec2": ["describe-instances", "start-instances", "stop-instances", "reboot-instances",
-                "describe-security-groups", "describe-vpcs", "describe-subnets", "create-image"],
-        "lambda": ["list-functions", "invoke", "get-function", "update-function-code",
-                   "create-function", "delete-function"],
-        "iam": ["list-users", "list-roles", "get-user", "list-policies", "attach-role-policy"],
+        "ec2": [
+            "describe-instances",
+            "start-instances",
+            "stop-instances",
+            "reboot-instances",
+            "describe-security-groups",
+            "describe-vpcs",
+            "describe-subnets",
+            "create-image",
+        ],
+        "lambda": [
+            "list-functions",
+            "invoke",
+            "get-function",
+            "update-function-code",
+            "create-function",
+            "delete-function",
+        ],
+        "iam": [
+            "list-users",
+            "list-roles",
+            "get-user",
+            "list-policies",
+            "attach-role-policy",
+        ],
         "sts": ["get-caller-identity", "assume-role", "get-session-token"],
-        "cloudformation": ["list-stacks", "describe-stacks", "create-stack", "update-stack", "delete-stack"],
+        "cloudformation": [
+            "list-stacks",
+            "describe-stacks",
+            "create-stack",
+            "update-stack",
+            "delete-stack",
+        ],
         "dynamodb": ["list-tables", "describe-table", "scan", "query", "update-table"],
-        "ecr": ["describe-repositories", "get-login-password", "list-images", "batch-delete-image"],
-        "ecs": ["list-clusters", "list-services", "describe-services", "update-service"],
+        "ecr": [
+            "describe-repositories",
+            "get-login-password",
+            "list-images",
+            "batch-delete-image",
+        ],
+        "ecs": [
+            "list-clusters",
+            "list-services",
+            "describe-services",
+            "update-service",
+        ],
         "eks": ["list-clusters", "describe-cluster", "update-kubeconfig"],
         "rds": ["describe-db-instances", "describe-db-clusters", "create-db-snapshot"],
         "logs": ["tail", "describe-log-groups", "describe-log-streams"],
@@ -101,21 +160,61 @@ class AWSCommandParser:
 
     PARAMETER_VALUES = {
         "--region": [
-            "us-east-1", "us-east-2", "us-west-1", "us-west-2",
-            "eu-west-1", "eu-west-2", "eu-west-3", "eu-central-1",
-            "ap-southeast-1", "ap-southeast-2", "ap-northeast-1", "ap-northeast-2",
-            "sa-east-1", "ca-central-1"
+            "us-east-1",
+            "us-east-2",
+            "us-west-1",
+            "us-west-2",
+            "eu-west-1",
+            "eu-west-2",
+            "eu-west-3",
+            "eu-central-1",
+            "ap-southeast-1",
+            "ap-southeast-2",
+            "ap-northeast-1",
+            "ap-northeast-2",
+            "sa-east-1",
+            "ca-central-1",
         ],
         "--output": ["json", "yaml", "yaml-stream", "text", "table"],
     }
 
     SERVICE_PARAMETERS = {
-        "s3": ["--recursive", "--exclude", "--include", "--delete", "--acl", "--storage-class"],
-        "ec2": ["--instance-ids", "--security-group-ids", "--vpc-id", "--subnet-id", "--filters"],
-        "lambda": ["--function-name", "--payload", "--zip-file", "--runtime", "--handler", "--role"],
+        "s3": [
+            "--recursive",
+            "--exclude",
+            "--include",
+            "--delete",
+            "--acl",
+            "--storage-class",
+        ],
+        "ec2": [
+            "--instance-ids",
+            "--security-group-ids",
+            "--vpc-id",
+            "--subnet-id",
+            "--filters",
+        ],
+        "lambda": [
+            "--function-name",
+            "--payload",
+            "--zip-file",
+            "--runtime",
+            "--handler",
+            "--role",
+        ],
         "iam": ["--role-name", "--policy-arn", "--user-name", "--group-name"],
-        "cloudformation": ["--stack-name", "--template-body", "--template-url", "--parameters"],
-        "dynamodb": ["--table-name", "--key", "--attribute-definitions", "--provisioned-throughput"],
+        "cloudformation": [
+            "--stack-name",
+            "--template-body",
+            "--template-url",
+            "--parameters",
+        ],
+        "dynamodb": [
+            "--table-name",
+            "--key",
+            "--attribute-definitions",
+            "--provisioned-throughput",
+        ],
     }
 
     def __init__(self):
@@ -140,10 +239,7 @@ class AWSCommandParser:
         text_to_cursor = command_line[:cursor_pos]
         tokens = self._tokenize(text_to_cursor)
 
-        parsed = ParsedCommand(
-            raw_input=command_line,
-            cursor_position=cursor_pos
-        )
+        parsed = ParsedCommand(raw_input=command_line, cursor_position=cursor_pos)
 
         if not tokens:
             parsed.current_context = CompletionContext.SERVICE
@@ -291,7 +387,9 @@ class AWSCommandParser:
             suggestions.extend(self.SERVICE_PARAMETERS[service])
 
         if self.use_dynamic_loading:
-            dynamic_params = self.service_loader.get_operation_parameters(service, command)
+            dynamic_params = self.service_loader.get_operation_parameters(
+                service, command
+            )
             suggestions.extend(dynamic_params)
 
         return list(set(suggestions))
@@ -316,7 +414,9 @@ class AWSCommandParser:
             special_cmds = [c for c in self.SPECIAL_COMMANDS if c.startswith(query)]
 
             if query.startswith("-"):
-                global_params = [p for p in self.GLOBAL_PARAMETERS if p.startswith(query)]
+                global_params = [
+                    p for p in self.GLOBAL_PARAMETERS if p.startswith(query)
+                ]
                 return global_params + special_cmds + services
 
             return special_cmds + services

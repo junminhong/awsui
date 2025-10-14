@@ -23,6 +23,7 @@ class ServiceModelLoader:
         # Try to import botocore and get its path
         try:
             import botocore
+
             botocore_module_path = Path(botocore.__file__).parent
             possible_paths.append(botocore_module_path / "data")
         except ImportError:
@@ -36,7 +37,9 @@ class ServiceModelLoader:
             ]
             for base_path in homebrew_paths:
                 if base_path.exists():
-                    for version_dir in base_path.glob("*/libexec/lib/python*/site-packages/awscli/botocore/data"):
+                    for version_dir in base_path.glob(
+                        "*/libexec/lib/python*/site-packages/awscli/botocore/data"
+                    ):
                         possible_paths.append(version_dir)
 
         # Check common Linux installation paths
@@ -52,6 +55,7 @@ class ServiceModelLoader:
         # Check user's site-packages
         try:
             import site
+
             for site_dir in site.getsitepackages():
                 possible_paths.append(Path(site_dir) / "botocore" / "data")
                 possible_paths.append(Path(site_dir) / "awscli" / "botocore" / "data")

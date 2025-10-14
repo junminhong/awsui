@@ -10,10 +10,7 @@ def check_aws_cli_available() -> bool:
     """Check if AWS CLI v2 is available."""
     try:
         result = subprocess.run(
-            ["aws", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=5
+            ["aws", "--version"], capture_output=True, text=True, timeout=5
         )
         return result.returncode == 0 and "aws-cli/2" in result.stdout
     except (subprocess.SubprocessError, FileNotFoundError):
@@ -31,7 +28,7 @@ def get_caller_identity(profile: str) -> Dict[str, Any] | None:
             ["aws", "sts", "get-caller-identity", "--profile", profile],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
         )
         if result.returncode == 0:
             return json.loads(result.stdout)
@@ -64,7 +61,7 @@ def sso_login(
     profile: str,
     cancel_check: Callable[[], bool] | None = None,
     timeout: int = 300,
-    poll_interval: float = 0.5
+    poll_interval: float = 0.5,
 ) -> bool:
     """
     Execute 'aws sso login --profile <name>' with optional cancellation.
@@ -75,7 +72,7 @@ def sso_login(
         process = subprocess.Popen(
             ["aws", "sso", "login", "--profile", profile],
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.STDOUT
+            stderr=subprocess.STDOUT,
         )
     except (OSError, ValueError, subprocess.SubprocessError):
         return False
@@ -99,8 +96,7 @@ def sso_login(
 
 
 def ensure_authenticated(
-    profile: str,
-    cancel_check: Callable[[], bool] | None = None
+    profile: str, cancel_check: Callable[[], bool] | None = None
 ) -> Dict[str, Any] | None:
     """
     Ensure profile is authenticated, performing SSO login if needed.

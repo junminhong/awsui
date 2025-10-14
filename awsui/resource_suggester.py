@@ -101,7 +101,13 @@ class ResourceSuggester:
             return cached
 
         output = self._run_aws_command(
-            ["aws", "ec2", "describe-instances", "--query", "Reservations[].Instances[].InstanceId"]
+            [
+                "aws",
+                "ec2",
+                "describe-instances",
+                "--query",
+                "Reservations[].Instances[].InstanceId",
+            ]
         )
 
         if output:
@@ -206,7 +212,13 @@ class ResourceSuggester:
             return cached
 
         output = self._run_aws_command(
-            ["aws", "ec2", "describe-security-groups", "--query", "SecurityGroups[].GroupId"]
+            [
+                "aws",
+                "ec2",
+                "describe-security-groups",
+                "--query",
+                "SecurityGroups[].GroupId",
+            ]
         )
 
         if output:

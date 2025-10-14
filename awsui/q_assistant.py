@@ -24,10 +24,7 @@ def get_q_cli_version() -> str | None:
     """
     try:
         result = subprocess.run(
-            ["q", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=5
+            ["q", "--version"], capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -42,7 +39,7 @@ def query_q_cli(
     profile_name: str | None = None,
     region: str | None = None,
     cancel_check: Callable[[], bool] | None = None,
-    timeout: int = 300
+    timeout: int = 300,
 ) -> tuple[str, bool]:
     """
     Query Amazon Q Developer CLI with a prompt.
@@ -76,11 +73,19 @@ def query_q_cli(
     try:
         # Note: --trust-all-tools allows Q to use tools without confirmation
         process = subprocess.Popen(
-            ["q", "chat", "--no-interactive", "--trust-all-tools", "--wrap", "never", full_prompt],
+            [
+                "q",
+                "chat",
+                "--no-interactive",
+                "--trust-all-tools",
+                "--wrap",
+                "never",
+                full_prompt,
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            env=env
+            env=env,
         )
 
         if cancel_check and cancel_check():
@@ -118,7 +123,7 @@ def stream_q_cli_query(
     profile_name: str | None = None,
     region: str | None = None,
     cancel_check: Callable[[], bool] | None = None,
-    timeout: int = 300
+    timeout: int = 300,
 ) -> subprocess.Popen[str] | None:
     """
     Start a streaming query to Amazon Q Developer CLI.
@@ -154,12 +159,20 @@ def stream_q_cli_query(
     try:
         # Note: --trust-all-tools allows Q to use tools without confirmation
         process = subprocess.Popen(
-            ["q", "chat", "--no-interactive", "--trust-all-tools", "--wrap", "never", full_prompt],
+            [
+                "q",
+                "chat",
+                "--no-interactive",
+                "--trust-all-tools",
+                "--wrap",
+                "never",
+                full_prompt,
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1,  # Line buffered
-            env=env
+            env=env,
         )
         return process
     except (FileNotFoundError, subprocess.SubprocessError):
@@ -176,14 +189,14 @@ def clean_ansi_codes(text: str) -> str:
     Returns:
         Clean text without ANSI codes
     """
-    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-    return ansi_escape.sub('', text)
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    return ansi_escape.sub("", text)
 
 
 def format_aws_context(
     profile_name: str | None = None,
     region: str | None = None,
-    account: str | None = None
+    account: str | None = None,
 ) -> str:
     """
     Format AWS context information for Q CLI query.

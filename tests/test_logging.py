@@ -1,12 +1,10 @@
 """Tests for structured logging functionality."""
 
 import json
-import sys
 import logging
 from io import StringIO
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
 
 from awsui.logging import StructuredLogger, JSONFormatter, get_logger
 

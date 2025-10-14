@@ -84,7 +84,7 @@ def parse_profiles() -> List[Profile]:
                 role=role,
                 region=section_data.get("region"),
                 session=session,
-                source=str(config_file)
+                source=str(config_file),
             )
             profiles.append(profile)
 
@@ -106,7 +106,7 @@ def parse_profiles() -> List[Profile]:
                 role=None,
                 region=None,
                 session=None,
-                source=str(credentials_file)
+                source=str(credentials_file),
             )
             profiles.append(profile)
 

@@ -2,10 +2,8 @@
 
 import json
 import subprocess
-import time
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
-import pytest
 
 from awsui.aws_cli import (
     check_aws_cli_available,
@@ -229,7 +227,8 @@ class TestEnsureAuthenticated:
 
     def test_cancelled_before_check(self):
         """Test cancellation before identity check."""
-        cancel_check = lambda: True
+        def cancel_check():
+            return True
 
         identity = ensure_authenticated("test-profile", cancel_check=cancel_check)
         assert identity is None

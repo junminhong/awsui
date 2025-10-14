@@ -131,7 +131,7 @@ AWS_CLI_CHEATSHEET = {
     ],
     "SNS": [
         "aws sns list-topics",
-        "aws sns publish --topic-arn <arn> --message \"Hello\"",
+        'aws sns publish --topic-arn <arn> --message "Hello"',
         "aws sns subscribe --topic-arn <arn> --protocol email --notification-endpoint <email>",
     ],
     "SQS": [

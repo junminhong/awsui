@@ -1,6 +1,5 @@
 """Tests for internationalization (i18n) translations."""
 
-import pytest
 
 from awsui.i18n import LANG_EN, LANG_ZH_TW
 

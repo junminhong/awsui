@@ -1,9 +1,8 @@
 """Tests for Amazon Q Developer CLI integration."""
 
 import subprocess
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
-import pytest
 
 from awsui.q_assistant import (
     check_q_cli_available,
@@ -160,7 +159,8 @@ class TestQueryQCLI:
 
     def test_query_cancellation(self):
         """Test query cancellation."""
-        cancel_check = lambda: True
+        def cancel_check():
+            return True
 
         with patch("awsui.q_assistant.check_q_cli_available") as mock_check, patch(
             "subprocess.Popen"
@@ -253,7 +253,8 @@ class TestStreamQCLIQuery:
 
     def test_stream_cancellation(self):
         """Test stream cancellation."""
-        cancel_check = lambda: True
+        def cancel_check():
+            return True
 
         with patch("awsui.q_assistant.check_q_cli_available") as mock_check:
             mock_check.return_value = True
