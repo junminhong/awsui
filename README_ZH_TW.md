@@ -298,32 +298,55 @@ region = us-east-1
 
 ```
 awsui/
-├── awsui/
+├── awsui/                      # 主套件
 │   ├── __init__.py
-│   ├── app.py           # 主要 Textual 應用程式
-│   ├── models.py        # Profile 資料模型
-│   ├── config.py        # AWS config 解析 (~/.aws/config)
-│   ├── aws_cli.py       # AWS CLI 包裝器 (SSO, STS)
-│   ├── q_assistant.py   # Amazon Q Developer CLI 整合
-│   ├── autocomplete.py  # 指令自動完成引擎
-│   ├── cheatsheet.py    # AWS CLI 指令參考
-│   ├── i18n.py          # 國際化 (EN/ZH-TW)
-│   └── logging.py       # 結構化 JSON 日誌
-├── tests/
+│   ├── app.py                  # 主要 Textual 應用程式
+│   ├── models.py               # Profile 資料模型
+│   ├── config.py               # AWS config 解析 (~/.aws/config)
+│   ├── aws_cli.py              # AWS CLI 包裝器 (SSO, STS)
+│   ├── q_assistant.py          # Amazon Q Developer CLI 整合
+│   ├── autocomplete.py         # 指令自動完成引擎
+│   ├── command_parser.py       # AWS CLI 指令解析器
+│   ├── parameter_metadata.py   # AWS 參數 metadata 處理
+│   ├── resource_suggester.py   # AWS 資源建議引擎
+│   ├── service_model_loader.py # AWS 服務模型載入器
+│   ├── cheatsheet.py           # AWS CLI 指令參考
+│   ├── i18n.py                 # 國際化 (EN/ZH-TW)
+│   └── logging.py              # 結構化 JSON 日誌
+├── tests/                      # 測試套件
+│   ├── __init__.py
+│   ├── conftest.py             # Pytest 設定
+│   ├── test_app.py
+│   ├── test_autocomplete.py
+│   ├── test_aws_cli.py
+│   ├── test_cheatsheet.py
+│   ├── test_command_parser.py
 │   ├── test_config.py
+│   ├── test_global_parameters.py
+│   ├── test_i18n.py
+│   ├── test_logging.py
 │   ├── test_models.py
-│   └── __init__.py
-├── docs/
-│   ├── prd.md
-│   ├── constitution.md
-│   ├── specify.md
-│   ├── clarify.md
-│   ├── plan.md
-│   └── tasks.md
-├── pyproject.toml
-├── LICENSE
-├── README.md
-└── README_ZH_TW.md
+│   ├── test_q_assistant.py
+│   ├── test_resource_suggester.py
+│   ├── test_service_model_loader.py
+│   ├── test_special_commands.py
+│   └── test_special_commands_no_autocomplete.py
+├── docs/                       # 文件網站
+│   ├── index.html
+│   ├── styles.css
+│   ├── script.js
+│   └── images/                 # 文件圖片
+├── images/                     # README 圖片
+│   ├── logo.png
+│   ├── demo01.png
+│   ├── demo02.png
+│   ├── demo03.png
+│   └── demo04.png
+├── pyproject.toml              # 專案設定
+├── uv.lock                     # 相依性鎖定檔案
+├── LICENSE                     # MIT 授權
+├── README.md                   # 英文文件
+└── README_ZH_TW.md             # 繁體中文文件
 ```
 
 ## 🧪 開發

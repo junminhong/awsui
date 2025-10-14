@@ -299,32 +299,55 @@ region = us-east-1
 
 ```
 awsui/
-├── awsui/
+├── awsui/                      # Main package
 │   ├── __init__.py
-│   ├── app.py           # Main Textual application
-│   ├── models.py        # Profile data models
-│   ├── config.py        # AWS config parsing (~/.aws/config)
-│   ├── aws_cli.py       # AWS CLI wrapper (SSO, STS)
-│   ├── q_assistant.py   # Amazon Q Developer CLI integration
-│   ├── autocomplete.py  # Command autocomplete engine
-│   ├── cheatsheet.py    # AWS CLI command reference
-│   ├── i18n.py          # Internationalization (EN/ZH-TW)
-│   └── logging.py       # Structured JSON logging
-├── tests/
+│   ├── app.py                  # Main Textual application
+│   ├── models.py               # Profile data models
+│   ├── config.py               # AWS config parsing (~/.aws/config)
+│   ├── aws_cli.py              # AWS CLI wrapper (SSO, STS)
+│   ├── q_assistant.py          # Amazon Q Developer CLI integration
+│   ├── autocomplete.py         # Command autocomplete engine
+│   ├── command_parser.py       # AWS CLI command parser
+│   ├── parameter_metadata.py   # AWS parameter metadata handling
+│   ├── resource_suggester.py   # AWS resource suggestion engine
+│   ├── service_model_loader.py # AWS service model loader
+│   ├── cheatsheet.py           # AWS CLI command reference
+│   ├── i18n.py                 # Internationalization (EN/ZH-TW)
+│   └── logging.py              # Structured JSON logging
+├── tests/                      # Test suite
+│   ├── __init__.py
+│   ├── conftest.py             # Pytest configuration
+│   ├── test_app.py
+│   ├── test_autocomplete.py
+│   ├── test_aws_cli.py
+│   ├── test_cheatsheet.py
+│   ├── test_command_parser.py
 │   ├── test_config.py
+│   ├── test_global_parameters.py
+│   ├── test_i18n.py
+│   ├── test_logging.py
 │   ├── test_models.py
-│   └── __init__.py
-├── docs/
-│   ├── prd.md
-│   ├── constitution.md
-│   ├── specify.md
-│   ├── clarify.md
-│   ├── plan.md
-│   └── tasks.md
-├── pyproject.toml
-├── LICENSE
-├── README.md
-└── README_ZH_TW.md
+│   ├── test_q_assistant.py
+│   ├── test_resource_suggester.py
+│   ├── test_service_model_loader.py
+│   ├── test_special_commands.py
+│   └── test_special_commands_no_autocomplete.py
+├── docs/                       # Documentation website
+│   ├── index.html
+│   ├── styles.css
+│   ├── script.js
+│   └── images/                 # Documentation images
+├── images/                     # README images
+│   ├── logo.png
+│   ├── demo01.png
+│   ├── demo02.png
+│   ├── demo03.png
+│   └── demo04.png
+├── pyproject.toml              # Project configuration
+├── uv.lock                     # Dependency lock file
+├── LICENSE                     # MIT License
+├── README.md                   # English documentation
+└── README_ZH_TW.md             # Traditional Chinese documentation
 ```
 
 ## 🧪 Development
