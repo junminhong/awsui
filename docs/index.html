@@ -3,542 +3,713 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#08111b" />
     <meta
       name="description"
-      content="awsui - A powerful, user-friendly terminal interface for AWS Profile and SSO management. Built with Textual for a modern, responsive TUI experience."
+      content="Run Codex, Claude Code, Terraform, and any CLI in the right verified AWS account. awsui maps project environments, checks identity with STS, and fails closed."
     />
     <meta
-      name="keywords"
-      content="aws, cli, tui, profile, sso, textual, terminal, aws-cli, python"
+      name="robots"
+      content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
     />
     <meta name="author" content="junminhong (jasper)" />
+    <link rel="canonical" href="https://junminhong.github.io/awsui/" />
 
-    <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://junminhong.github.io/awsui/" />
     <meta
       property="og:title"
-      content="awsui - AWS Profile & SSO Management TUI"
+      content="awsui — Verified AWS Contexts for AI Agents &amp; CLI Tools"
     />
     <meta
       property="og:description"
-      content="A powerful, user-friendly terminal interface for AWS Profile and SSO management."
+      content="Run Codex, Claude Code, Terraform, and any CLI in the right verified AWS account. awsui maps project environments, checks identity with STS, and fails closed."
+    />
+    <meta property="og:site_name" content="awsui" />
+    <meta property="og:locale" content="en_US" />
+    <meta
+      property="og:image"
+      content="https://junminhong.github.io/awsui/images/awsui-social-card.png"
+    />
+    <meta
+      property="og:image:secure_url"
+      content="https://junminhong.github.io/awsui/images/awsui-social-card.png"
+    />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="awsui Context Dashboard showing verified project environments and AWS identities"
     />
 
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta
-      property="twitter:url"
+      name="twitter:url"
       content="https://junminhong.github.io/awsui/"
     />
     <meta
-      property="twitter:title"
-      content="awsui - AWS Profile & SSO Management TUI"
+      name="twitter:title"
+      content="awsui — Verified AWS Contexts for AI Agents &amp; CLI Tools"
     />
     <meta
-      property="twitter:description"
-      content="A powerful, user-friendly terminal interface for AWS Profile and SSO management."
+      name="twitter:description"
+      content="Run Codex, Claude Code, Terraform, and any CLI in the right verified AWS account. awsui maps project environments, checks identity with STS, and fails closed."
+    />
+    <meta
+      name="twitter:image"
+      content="https://junminhong.github.io/awsui/images/awsui-social-card.png"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="awsui Context Dashboard showing verified project environments and AWS identities"
     />
 
-    <title>awsui - AWS Profile & SSO Management TUI</title>
+    <title>awsui — Verified AWS Contexts for AI Agents &amp; CLI Tools</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://junminhong.github.io/awsui/#website",
+            "url": "https://junminhong.github.io/awsui/",
+            "name": "awsui",
+            "description": "Run Codex, Claude Code, Terraform, and any CLI in the right verified AWS account. awsui maps project environments, checks identity with STS, and fails closed.",
+            "inLanguage": "en",
+            "creator": {
+              "@id": "https://junminhong.github.io/awsui/#author"
+            }
+          },
+          {
+            "@type": "SoftwareSourceCode",
+            "@id": "https://junminhong.github.io/awsui/#software",
+            "name": "awsui",
+            "url": "https://junminhong.github.io/awsui/",
+            "description": "Run AI coding agents and CLI tools inside a verified AWS project context.",
+            "codeRepository": "https://github.com/junminhong/awsui",
+            "sameAs": [
+              "https://github.com/junminhong/awsui",
+              "https://pypi.org/project/awsui/"
+            ],
+            "programmingLanguage": {
+              "@type": "ComputerLanguage",
+              "name": "Python 3.13",
+              "url": "https://www.python.org/"
+            },
+            "runtimePlatform": ["Python 3.13", "AWS CLI v2"],
+            "license": "https://opensource.org/licenses/MIT",
+            "author": {
+              "@id": "https://junminhong.github.io/awsui/#author"
+            },
+            "isPartOf": {
+              "@id": "https://junminhong.github.io/awsui/#website"
+            },
+            "image": "https://junminhong.github.io/awsui/images/awsui-social-card.png"
+          },
+          {
+            "@type": "Person",
+            "@id": "https://junminhong.github.io/awsui/#author",
+            "name": "junminhong (jasper)",
+            "url": "https://github.com/junminhong"
+          }
+        ]
+      }
+    </script>
     <link rel="stylesheet" href="styles.css" />
-    <link rel="icon" type="image/png" href="images/logo02.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png" />
   </head>
   <body>
-    <!-- Navigation -->
-    <nav class="navbar">
-      <div class="container">
-        <div class="nav-brand">
-          <img src="images/logo02.png" alt="awsui logo" class="logo-small" />
-          <span class="brand-name">awsui</span>
-        </div>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <header class="site-header">
+      <nav class="navbar container" aria-label="Primary navigation">
+        <a class="wordmark" href="#top" aria-label="awsui home">
+          <span class="wordmark-prompt" aria-hidden="true">$</span>
+          <span>awsui</span><span class="wordmark-cursor" aria-hidden="true">_</span>
+        </a>
+
         <button
           class="nav-toggle"
           id="navToggle"
-          aria-label="Toggle navigation"
+          type="button"
+          aria-controls="navMenu"
+          aria-expanded="false"
+          aria-label="Open navigation"
         >
           <span></span>
           <span></span>
           <span></span>
         </button>
-        <ul class="nav-menu" id="navMenu">
-          <li><a href="#features">Features</a></li>
-          <li><a href="#demo">Demo</a></li>
-          <li><a href="#quickstart">Quick Start</a></li>
-          <li><a href="#docs">Docs</a></li>
-          <li>
-            <a
-              href="https://github.com/junminhong/awsui"
-              target="_blank"
-              rel="noopener"
-              >GitHub</a
-            >
-          </li>
-        </ul>
-      </div>
-    </nav>
 
-    <!-- Hero Section -->
-    <section class="hero">
-      <div class="container">
-        <div class="hero-content">
-          <img src="images/logo01.png" alt="awsui logo" class="hero-logo" />
-          <h1>awsui</h1>
-          <p class="hero-subtitle">
-            A powerful, user-friendly terminal interface for AWS Profile and SSO
-            management
-          </p>
-          <p class="hero-tagline">
-            Built with
-            <a
-              href="https://textual.textualize.io/"
-              target="_blank"
-              rel="noopener"
-              >Textual</a
-            >
-            for a modern, responsive TUI experience
-          </p>
-
-          <div class="hero-badges">
-            <a
-              href="https://pypi.org/project/awsui/"
-              target="_blank"
-              rel="noopener"
-            >
-              <img
-                src="https://img.shields.io/pypi/v/awsui?color=blue"
-                alt="PyPI version"
-              />
-            </a>
-            <a
-              href="https://pypi.org/project/awsui/"
-              target="_blank"
-              rel="noopener"
-            >
-              <img
-                src="https://img.shields.io/pypi/pyversions/awsui"
-                alt="Python versions"
-              />
-            </a>
-            <a
-              href="https://pypi.org/project/awsui/"
-              target="_blank"
-              rel="noopener"
-            >
-              <img src="https://img.shields.io/pypi/dw/awsui" alt="Downloads" />
-            </a>
-            <a
-              href="https://opensource.org/licenses/MIT"
-              target="_blank"
-              rel="noopener"
-            >
-              <img
-                src="https://img.shields.io/badge/License-MIT-yellow.svg"
-                alt="License: MIT"
-              />
-            </a>
-            <a
-              href="https://github.com/junminhong/awsui"
-              target="_blank"
-              rel="noopener"
-            >
-              <img
-                src="https://img.shields.io/github/stars/junminhong/awsui?style=social"
-                alt="GitHub stars"
-              />
-            </a>
-          </div>
-
-          <div class="hero-highlights">
-            <span class="highlight">⚡ Fast</span>
-            <span class="highlight">🔐 Secure</span>
-            <span class="highlight">🤖 AI-Powered</span>
-            <span class="highlight">🌍 Bilingual</span>
-          </div>
-
-          <div class="hero-cta">
-            <a href="#quickstart" class="btn btn-primary">Get Started</a>
-            <a
-              href="https://github.com/junminhong/awsui"
-              class="btn btn-secondary"
-              target="_blank"
-              rel="noopener"
-              >View on GitHub</a
-            >
-          </div>
+        <div class="nav-menu" id="navMenu">
+          <a class="nav-link" href="#workflow">How it works</a>
+          <a class="nav-link" href="#features">Features</a>
+          <a class="nav-link" href="#demo">TUI</a>
+          <a class="nav-link" href="#docs">Docs</a>
+          <a
+            class="nav-github"
+            href="https://github.com/junminhong/awsui"
+            target="_blank"
+            rel="noopener"
+          >
+            GitHub
+            <span aria-hidden="true">↗</span>
+          </a>
         </div>
-      </div>
-    </section>
+      </nav>
+    </header>
 
-    <!-- Features Section -->
-    <section id="features" class="features">
-      <div class="container">
-        <h2 class="section-title">Why awsui?</h2>
-        <div class="features-grid">
-          <div class="feature-card">
-            <div class="feature-icon">⚡</div>
-            <h3>Lightning Fast</h3>
-            <p>
-              Search and switch between dozens of AWS profiles in milliseconds
-              with real-time fuzzy matching
+    <main id="main-content">
+      <section class="hero" id="top">
+        <div class="hero-grid container">
+          <div class="hero-copy">
+            <p class="eyebrow">
+              <span class="status-dot" aria-hidden="true"></span>
+              Verified AWS contexts for AI agents
             </p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🔐</div>
-            <h3>SSO Made Easy</h3>
-            <p>
-              Automatic re-authentication when credentials expire - no manual
-              login headaches
+            <h1>Run your AI agent in the <span>right AWS account.</span></h1>
+            <p class="hero-lede">
+              Pick <strong>dev</strong>, <strong>qa</strong>,
+              <strong>staging</strong>, or <strong>prod</strong> once. awsui
+              authenticates, verifies the AWS identity, and launches your tools
+              in that context.
             </p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🤖</div>
-            <h3>AI-Powered Assistant</h3>
-            <p>
-              Integrated Amazon Q Developer CLI for intelligent AWS assistance
-              with streaming responses
+            <div class="hero-actions">
+              <a class="button button-primary" href="#quickstart">
+                Get started
+                <span aria-hidden="true">↓</span>
+              </a>
+              <a
+                class="button button-secondary"
+                href="https://github.com/junminhong/awsui"
+                target="_blank"
+                rel="noopener"
+              >
+                View on GitHub
+                <span aria-hidden="true">↗</span>
+              </a>
+            </div>
+            <p class="hero-note">
+              <span aria-hidden="true">✓</span> STS verified before the child
+              process starts
             </p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🎯</div>
-            <h3>Smart CLI</h3>
-            <p>
-              Command autocomplete with AWS CLI cheatsheet built-in for 15+
-              services
-            </p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🌍</div>
-            <h3>Bilingual Support</h3>
-            <p>Full support for English and Traditional Chinese interfaces</p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">📊</div>
-            <h3>Clear Visibility</h3>
-            <p>
-              See profile details, account info, and current identity at a
-              glance
-            </p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🎨</div>
-            <h3>Modern UX</h3>
-            <p>
-              Beautiful, keyboard-driven interface that respects your terminal
-              theme
-            </p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🔒</div>
-            <h3>Secure by Design</h3>
-            <p>
-              Uses AWS CLI's credential system - no credential storage or
-              caching
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Demo Section -->
-    <section id="demo" class="demo">
-      <div class="container">
-        <h2 class="section-title">See It in Action</h2>
-        <div class="demo-gallery">
-          <div class="demo-item">
-            <img
-              src="images/demo01.png"
-              alt="Profile search and switching"
-              loading="lazy"
-            />
-            <p class="demo-caption">
-              ⚡ Fast profile search and switching with real-time filtering
-            </p>
-          </div>
-          <div class="demo-item">
-            <img
-              src="images/demo02.png"
-              alt="AWS CLI execution"
-              loading="lazy"
-            />
-            <p class="demo-caption">
-              🎯 Smart CLI with command autocomplete and inline execution
-            </p>
-          </div>
-          <div class="demo-item">
-            <img
-              src="images/demo03.png"
-              alt="Amazon Q AI assistant"
-              loading="lazy"
-            />
-            <p class="demo-caption">
-              🤖 AI-powered Amazon Q Developer integration with streaming
-              responses
-            </p>
-          </div>
-          <div class="demo-item">
-            <img
-              src="images/demo04.png"
-              alt="AWS CLI cheatsheet"
-              loading="lazy"
-            />
-            <p class="demo-caption">
-              📚 Built-in AWS CLI cheatsheet with quick reference for 15+
-              services
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Quick Start Section -->
-    <section id="quickstart" class="quickstart">
-      <div class="container">
-        <h2 class="section-title">Quick Start</h2>
-        <div class="quickstart-content">
-          <div class="install-method">
-            <h3>Install with uv (Recommended)</h3>
-            <pre><code># Install as a tool (isolated environment)
-uv tool install --python 3.13 awsui
-
-# Run directly
-awsui</code></pre>
           </div>
 
-          <div class="install-method">
-            <h3>Install with pip</h3>
-            <pre><code># Install from PyPI
-pip install awsui
-
-# Run
-awsui</code></pre>
-          </div>
-
-          <div class="requirements">
-            <h3>Requirements</h3>
-            <ul>
-              <li><strong>Python:</strong> ≥ 3.13, &lt; 3.14</li>
-              <li><strong>AWS CLI:</strong> v2 (required)</li>
-              <li>
-                <strong>Amazon Q CLI:</strong> Optional, for AI assistance
-              </li>
-              <li>
-                <strong>uv:</strong> Recommended for dependency management
-              </li>
-            </ul>
-          </div>
-
-          <div class="keyboard-shortcuts">
-            <h3>Key Shortcuts</h3>
-            <div class="shortcuts-grid">
-              <div class="shortcut">
-                <kbd>/</kbd>
-                <span>Focus search box</span>
+          <div class="hero-terminal-wrap">
+            <div
+              class="terminal-window terminal-sequence"
+              data-terminal-sequence
+              aria-hidden="true"
+            >
+              <div class="terminal-titlebar">
+                <div class="terminal-dots" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </div>
+                <span>awsui — verified context</span>
+                <span class="terminal-lock">locked</span>
               </div>
-              <div class="shortcut">
-                <kbd>↑</kbd> <kbd>↓</kbd>
-                <span>Navigate profiles</span>
-              </div>
-              <div class="shortcut">
-                <kbd>Enter</kbd>
-                <span>Apply selected profile</span>
-              </div>
-              <div class="shortcut">
-                <kbd>c</kbd>
-                <span>Focus CLI input</span>
-              </div>
-              <div class="shortcut">
-                <kbd>a</kbd>
-                <span>Toggle AI assistant</span>
-              </div>
-              <div class="shortcut">
-                <kbd>h</kbd>
-                <span>Show cheatsheet</span>
-              </div>
-              <div class="shortcut">
-                <kbd>l</kbd>
-                <span>Force SSO login</span>
-              </div>
-              <div class="shortcut">
-                <kbd>w</kbd>
-                <span>Show current identity</span>
-              </div>
-              <div class="shortcut">
-                <kbd>q</kbd>
-                <span>Quit</span>
+              <div class="terminal-body">
+                <div class="terminal-command" data-terminal-step>
+                  <span class="prompt">$</span>
+                  <span data-terminal-command>awsui prod -- codex</span>
+                  <span class="terminal-caret"></span>
+                </div>
+                <div class="terminal-status" data-terminal-step>
+                  <span class="spinner-dot"></span>
+                  Authenticating and verifying AWS identity...
+                </div>
+                <div class="terminal-result" data-terminal-step>
+                  <div class="terminal-result-title">
+                    <span>payment-service · PROD</span>
+                    <span class="protected-badge">PROTECTED</span>
+                  </div>
+                  <div class="terminal-result-row" data-terminal-step>
+                    <span>Account</span>
+                    <span>999999999999 <b>✓</b></span>
+                  </div>
+                  <div class="terminal-result-row" data-terminal-step>
+                    <span>Region</span>
+                    <span>ap-northeast-1</span>
+                  </div>
+                  <div class="terminal-result-row" data-terminal-step>
+                    <span>Launch</span>
+                    <span>codex</span>
+                  </div>
+                </div>
+                <div class="terminal-ready" data-terminal-step>
+                  <span>●</span> Identity verified. Starting process.
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Documentation Section -->
-    <section id="docs" class="docs">
-      <div class="container">
-        <h2 class="section-title">Documentation & Resources</h2>
-        <div class="docs-grid">
-          <a
-            href="https://github.com/junminhong/awsui/blob/main/README.md"
-            class="doc-card"
-            target="_blank"
-            rel="noopener"
-          >
-            <h3>📖 Full Documentation</h3>
-            <p>
-              Complete guide including configuration, usage, and troubleshooting
+            <p class="sr-only">
+              Running awsui prod -- codex verifies account 999999999999 in
+              ap-northeast-1 before launching Codex.
             </p>
-          </a>
-          <a
-            href="https://github.com/junminhong/awsui/blob/main/README_ZH_TW.md"
-            class="doc-card"
-            target="_blank"
-            rel="noopener"
-          >
-            <h3>繁體中文文檔</h3>
-            <p>完整的繁體中文使用說明與疑難排解</p>
-          </a>
-          <a
-            href="https://pypi.org/project/awsui/"
-            class="doc-card"
-            target="_blank"
-            rel="noopener"
-          >
-            <h3>📦 PyPI Package</h3>
-            <p>Download and installation information on Python Package Index</p>
-          </a>
-          <a
-            href="https://github.com/junminhong/awsui/issues"
-            class="doc-card"
-            target="_blank"
-            rel="noopener"
-          >
-            <h3>🐛 Report Issues</h3>
-            <p>Found a bug or have a feature request? Let us know!</p>
-          </a>
+            <div class="terminal-glow" aria-hidden="true"></div>
+          </div>
         </div>
-      </div>
-    </section>
 
-    <!-- Footer -->
-    <footer class="footer">
-      <div class="container">
-        <div class="footer-content">
-          <div class="footer-section">
-            <h4>awsui</h4>
-            <p>Making AWS Profile switching delightful!</p>
-            <p class="footer-tagline">Made with ❤️ for AWS Developers</p>
+        <div class="toolbelt container" aria-label="Supported command-line tools">
+          <span>Bring your tool</span>
+          <ul>
+            <li>Claude Code</li>
+            <li>Codex</li>
+            <li>Kiro</li>
+            <li>Terraform</li>
+            <li>Antigravity</li>
+            <li>Any CLI</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section workflow" id="workflow">
+        <div class="container">
+          <div class="section-heading reveal">
+            <p class="section-kicker">One choice, every process</p>
+            <h2>Think in environments, not local profile names.</h2>
+            <p>
+              Your team shares the intended account and region. Each developer
+              keeps their own local AWS profile binding.
+            </p>
           </div>
-          <div class="footer-section">
-            <h4>Links</h4>
-            <ul>
-              <li>
-                <a
-                  href="https://github.com/junminhong/awsui"
-                  target="_blank"
-                  rel="noopener"
-                  >GitHub Repository</a
-                >
-              </li>
-              <li>
-                <a
-                  href="https://pypi.org/project/awsui/"
-                  target="_blank"
-                  rel="noopener"
-                  >PyPI Package</a
-                >
-              </li>
-              <li>
-                <a
-                  href="https://github.com/junminhong/awsui/issues"
-                  target="_blank"
-                  rel="noopener"
-                  >Issue Tracker</a
-                >
-              </li>
-            </ul>
-          </div>
-          <div class="footer-section">
-            <h4>Built With</h4>
-            <ul>
-              <li>
-                <a
-                  href="https://textual.textualize.io/"
-                  target="_blank"
-                  rel="noopener"
-                  >Textual</a
-                >
-              </li>
-              <li>
-                <a
-                  href="https://docs.astral.sh/uv/"
-                  target="_blank"
-                  rel="noopener"
-                  >uv</a
-                >
-              </li>
-              <li>
-                <a
-                  href="https://aws.amazon.com/cli/"
-                  target="_blank"
-                  rel="noopener"
-                  >AWS CLI</a
-                >
-              </li>
-              <li>
-                <a
-                  href="https://aws.amazon.com/q/developer/"
-                  target="_blank"
-                  rel="noopener"
-                  >Amazon Q Developer</a
-                >
-              </li>
-            </ul>
-          </div>
-          <div class="footer-section">
-            <h4>Resources</h4>
-            <ul>
-              <li>
-                <a
-                  href="https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html"
-                  target="_blank"
-                  rel="noopener"
-                  >AWS CLI SSO Configuration</a
-                >
-              </li>
-              <li>
-                <a
-                  href="https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line.html"
-                  target="_blank"
-                  rel="noopener"
-                  >Amazon Q Developer CLI</a
-                >
-              </li>
-              <li>
-                <a
-                  href="https://textual.textualize.io/"
-                  target="_blank"
-                  rel="noopener"
-                  >Textual Documentation</a
-                >
-              </li>
-            </ul>
+
+          <div class="workflow-grid">
+            <article class="workflow-card reveal">
+              <div class="step-number">01</div>
+              <p class="card-label">Define</p>
+              <h3>Commit project contexts</h3>
+              <p>
+                Describe dev, qa, staging, and prod once in a project-level
+                <code>.awsui.yaml</code>.
+              </p>
+              <div class="mini-code"><span>prod</span> → 999999999999</div>
+            </article>
+
+            <article class="workflow-card reveal">
+              <div class="step-number">02</div>
+              <p class="card-label">Bind</p>
+              <h3>Map your local profile</h3>
+              <p>
+                Keep machine-specific profile names outside Git while sharing
+                the same logical environments.
+              </p>
+              <div class="mini-code"><span>$</span> awsui bind prod</div>
+            </article>
+
+            <article class="workflow-card reveal">
+              <div class="step-number">03</div>
+              <p class="card-label">Verify &amp; launch</p>
+              <h3>Start any tool safely</h3>
+              <p>
+                awsui verifies the authenticated account, sets the region, and
+                only then starts the child process.
+              </p>
+              <div class="mini-code"><span>$</span> awsui prod -- codex</div>
+            </article>
           </div>
         </div>
-        <div class="footer-bottom">
-          <p>
-            &copy; 2025 junminhong (jasper). Licensed under the
+      </section>
+
+      <section class="section features" id="features">
+        <div class="container">
+          <div class="section-heading reveal">
+            <p class="section-kicker">Designed to fail closed</p>
+            <h2>The context is verified, not assumed.</h2>
+            <p>
+              A familiar profile name is not proof. awsui checks the real AWS
+              identity before handing control to your agent or CLI.
+            </p>
+          </div>
+
+          <div class="feature-bento">
+            <article class="feature-card feature-card-wide reveal">
+              <div class="feature-copy">
+                <p class="card-label">STS identity check</p>
+                <h3>Verified before launch</h3>
+                <p>
+                  Expected and authenticated account IDs must match. Wrong but
+                  valid credentials are blocked before they reach your command.
+                </p>
+              </div>
+              <div class="identity-compare" aria-label="Expected and authenticated accounts match">
+                <div>
+                  <span>Expected account</span>
+                  <strong>999999999999</strong>
+                </div>
+                <span class="identity-link" aria-hidden="true">→</span>
+                <div>
+                  <span>Authenticated</span>
+                  <strong>999999999999 <b>✓</b></strong>
+                </div>
+              </div>
+            </article>
+
+            <article class="feature-card feature-card-protected reveal">
+              <p class="card-label">Production safety</p>
+              <h3>Fail closed</h3>
+              <p>
+                A mismatch or failed identity check means the command never
+                starts.
+              </p>
+              <div class="blocked-command">
+                <span>✕</span>
+                Command was not started.
+              </div>
+            </article>
+
+            <article class="feature-card reveal">
+              <p class="card-label">Team-friendly</p>
+              <h3>Shared intent, local bindings</h3>
+              <p>
+                Commit account and region definitions without committing each
+                developer's profile names.
+              </p>
+            </article>
+
+            <article class="feature-card reveal">
+              <p class="card-label">Deterministic runtime</p>
+              <h3>A clean child environment</h3>
+              <p>
+                Profile and region are set while direct credential overrides
+                are removed from the launch environment.
+              </p>
+            </article>
+
+            <article class="feature-card reveal">
+              <p class="card-label">Tool-agnostic</p>
+              <h3>Bring your AI</h3>
+              <p>
+                Claude Code, Codex, Kiro, Terraform, scripts, or an interactive
+                shell—all use the same verified context.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section use-cases" id="use-cases" aria-labelledby="use-cases-title">
+        <div class="container">
+          <div class="section-heading reveal">
+            <p class="section-kicker">Built for guarded workflows</p>
+            <h2 id="use-cases-title">One verified AWS context for every AI coding agent.</h2>
+            <p>
+              Use the same project intent across Codex, Claude Code, Terraform,
+              Antigravity, and any CLI without sharing developer-specific profile names.
+            </p>
+          </div>
+
+          <div class="use-case-grid">
+            <article class="use-case-card reveal">
+              <p class="card-label">AI coding agents</p>
+              <h3>Launch Codex and Claude Code in the intended account</h3>
+              <p>
+                Choose dev, staging, or prod. awsui resolves the developer's local
+                profile, authenticates it, checks the STS account, and only then
+                starts the agent.
+              </p>
+            </article>
+
+            <article class="use-case-card reveal">
+              <p class="card-label">Infrastructure tooling</p>
+              <h3>Put Terraform and deployment CLIs behind an identity check</h3>
+              <p>
+                Commands never start when the authenticated AWS account does not
+                match the account declared for the project environment.
+              </p>
+            </article>
+
+            <article class="use-case-card reveal">
+              <p class="card-label">Team environments</p>
+              <h3>Share account intent without sharing local profile names</h3>
+              <p>
+                Commit expected accounts and regions in <code>.awsui.yaml</code>
+                while each developer keeps their machine-specific profile binding local.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section tui-section" id="demo">
+        <div class="container tui-grid">
+          <div class="tui-copy reveal">
+            <p class="section-kicker">Context Dashboard</p>
+            <h2>See every project environment at a glance.</h2>
+            <p>
+              Run <code>awsui</code> without a subcommand to select dev, qa,
+              staging, or prod; verify its AWS identity; and launch your tool.
+            </p>
+            <ul class="check-list">
+              <li>Clear ready, verified, mismatch, and error states</li>
+              <li>Expected and authenticated account details</li>
+              <li>Keyboard-first bind, verify, launch, shell, and doctor actions</li>
+            </ul>
             <a
-              href="https://opensource.org/licenses/MIT"
+              class="text-link"
+              href="https://github.com/junminhong/awsui#-features"
               target="_blank"
               rel="noopener"
-              >MIT License</a
-            >.
-          </p>
+            >
+              Explore the Context Dashboard <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+
+          <figure class="tui-preview reveal">
+            <button
+              class="image-open"
+              type="button"
+              data-dialog-open="demoDialog"
+              aria-label="Expand the awsui TUI screenshot"
+            >
+              <img
+                src="images/demo01.png"
+                alt="awsui Context Dashboard ready to initialize a project"
+                width="2532"
+                height="1371"
+                loading="lazy"
+                decoding="async"
+              />
+              <span>Expand screenshot</span>
+            </button>
+            <figcaption>Start a project from the Context Dashboard.</figcaption>
+          </figure>
         </div>
+      </section>
+
+      <section class="section quickstart" id="quickstart">
+        <div class="container">
+          <div class="section-heading reveal">
+            <p class="section-kicker">Quick start</p>
+            <h2>From install to verified context in minutes.</h2>
+            <p>
+              awsui uses the credentials already managed by AWS CLI. It never
+              stores AWS credentials itself.
+            </p>
+          </div>
+
+          <div class="quickstart-grid">
+            <article class="code-panel reveal">
+              <div class="code-panel-heading">
+                <div>
+                  <span>Terminal</span>
+                  <h3>Install and run</h3>
+                </div>
+                <button
+                  class="copy-button"
+                  type="button"
+                  data-copy-target="installCommands"
+                >
+                  Copy
+                </button>
+              </div>
+              <pre id="installCommands"><code><span class="code-comment"># Install as an isolated tool</span>
+uv tool install --python 3.13 awsui
+
+<span class="code-comment"># Initialize this AWS project</span>
+cd payment-service
+awsui init
+awsui bind prod
+
+<span class="code-comment"># Verify, then launch</span>
+awsui context prod
+awsui prod -- codex
+awsui dev
+
+<span class="code-comment"># Compatible explicit forms</span>
+awsui run prod -- claude
+awsui shell dev</code></pre>
+            </article>
+
+            <article class="code-panel reveal">
+              <div class="code-panel-heading">
+                <div>
+                  <span>.awsui.yaml</span>
+                  <h3>Shared project intent</h3>
+                </div>
+                <button
+                  class="copy-button"
+                  type="button"
+                  data-copy-target="configExample"
+                >
+                  Copy
+                </button>
+              </div>
+              <pre id="configExample"><code>version: 1
+project: payment-service
+contexts:
+  dev:
+    account: "111111111111"
+    region: ap-northeast-1
+  prod:
+    account: "999999999999"
+    region: ap-northeast-1
+    protected: true</code></pre>
+            </article>
+          </div>
+
+          <div class="requirement-strip reveal">
+            <div><span>Python</span><strong>3.13</strong></div>
+            <div><span>AWS CLI</span><strong>v2 required</strong></div>
+            <div><span>Credentials</span><strong>Managed by AWS CLI</strong></div>
+            <div><span>License</span><strong>MIT</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section faq-section" id="faq" aria-labelledby="faq-title">
+        <div class="container">
+          <div class="section-heading reveal">
+            <p class="section-kicker">Frequently asked</p>
+            <h2 id="faq-title">Questions about verified AWS contexts.</h2>
+            <p>Short answers for teams bringing AI agents and CLI tools into AWS.</p>
+          </div>
+
+          <div class="faq-grid">
+            <article class="faq-card reveal">
+              <h3>What does awsui mean by an AWS context?</h3>
+              <p>
+                A named project environment such as dev or prod. It declares the
+                expected 12-digit AWS account and region, then maps that shared
+                intent to a local AWS profile.
+              </p>
+            </article>
+
+            <article class="faq-card reveal">
+              <h3>How does awsui verify the AWS account before launch?</h3>
+              <p>
+                It authenticates the bound profile, queries AWS STS caller identity,
+                compares the returned account with the project configuration, and
+                aborts when identity is unavailable or mismatched.
+              </p>
+            </article>
+
+            <article class="faq-card reveal">
+              <h3>Does awsui store AWS credentials?</h3>
+              <p>
+                No. awsui uses the credentials and SSO sessions already managed by
+                AWS CLI, prepares a deterministic child environment, and does not
+                persist AWS access keys or session tokens.
+              </p>
+            </article>
+
+            <article class="faq-card reveal">
+              <h3>Which AI agents and CLI tools can awsui launch?</h3>
+              <p>
+                Any child process can run inside a verified context, including Codex,
+                Claude Code, Kiro, Antigravity, Terraform, and AWS CLI. awsui supports
+                macOS, Linux, and Windows wherever Python 3.13 and AWS CLI v2 are available.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section resources" id="docs">
+        <div class="container">
+          <div class="section-heading reveal">
+            <p class="section-kicker">Documentation</p>
+            <h2>Everything you need to go deeper.</h2>
+          </div>
+
+          <div class="resource-grid">
+            <a
+              class="resource-card reveal"
+              href="https://github.com/junminhong/awsui/blob/main/README.md"
+              target="_blank"
+              rel="noopener"
+            >
+              <span class="resource-index">01</span>
+              <h3>Full documentation</h3>
+              <p>Configuration, commands, workflows, and troubleshooting.</p>
+              <span class="resource-arrow" aria-hidden="true">↗</span>
+            </a>
+            <a
+              class="resource-card reveal"
+              href="https://github.com/junminhong/awsui/blob/main/README_ZH_TW.md"
+              target="_blank"
+              rel="noopener"
+            >
+              <span class="resource-index">02</span>
+              <h3>繁體中文文件</h3>
+              <p>完整的繁體中文安裝、設定與使用說明。</p>
+              <span class="resource-arrow" aria-hidden="true">↗</span>
+            </a>
+            <a
+              class="resource-card reveal"
+              href="https://pypi.org/project/awsui/"
+              target="_blank"
+              rel="noopener"
+            >
+              <span class="resource-index">03</span>
+              <h3>PyPI package</h3>
+              <p>Published versions and package installation details.</p>
+              <span class="resource-arrow" aria-hidden="true">↗</span>
+            </a>
+            <a
+              class="resource-card reveal"
+              href="https://github.com/junminhong/awsui/issues"
+              target="_blank"
+              rel="noopener"
+            >
+              <span class="resource-index">04</span>
+              <h3>Issues &amp; feedback</h3>
+              <p>Report a bug, request a feature, or join the discussion.</p>
+              <span class="resource-arrow" aria-hidden="true">↗</span>
+            </a>
+          </div>
+
+          <div class="closing-cta reveal">
+            <div>
+              <p class="section-kicker">Bring your AI</p>
+              <h2>awsui brings the AWS context.</h2>
+            </div>
+            <a class="button button-primary" href="#quickstart">Install awsui</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-grid">
+        <div>
+          <a class="wordmark footer-wordmark" href="#top">
+            <span class="wordmark-prompt" aria-hidden="true">$</span>
+            <span>awsui</span><span class="wordmark-cursor" aria-hidden="true">_</span>
+          </a>
+          <p>Verified AWS contexts for whichever AI or CLI you bring.</p>
+        </div>
+        <div class="footer-links">
+          <a href="#faq">FAQ</a>
+          <a href="https://github.com/junminhong/awsui" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://pypi.org/project/awsui/" target="_blank" rel="noopener">PyPI</a>
+          <a href="https://github.com/junminhong/awsui/issues" target="_blank" rel="noopener">Issues</a>
+          <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener">MIT License</a>
+        </div>
+      </div>
+      <div class="container footer-bottom">
+        <p>© 2026 junminhong (jasper).</p>
+        <p>Built for AWS developers who would rather think in environments.</p>
       </div>
     </footer>
 
+    <dialog class="image-dialog" id="demoDialog" aria-label="Expanded awsui TUI screenshot">
+      <div class="dialog-toolbar">
+        <span>awsui Context Dashboard</span>
+        <button type="button" data-dialog-close aria-label="Close screenshot">Close</button>
+      </div>
+      <img
+        src="images/demo01.png"
+        alt="Expanded awsui Context Dashboard ready to initialize a project"
+        width="2532"
+        height="1371"
+        loading="lazy"
+        decoding="async"
+      />
+    </dialog>
+
+    <div class="copy-status sr-only" aria-live="polite" id="copyStatus"></div>
     <script src="script.js"></script>
   </body>
 </html>
