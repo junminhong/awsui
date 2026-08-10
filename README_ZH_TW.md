@@ -1,20 +1,13 @@
 # awsui
+
 <p align="center">
-    <picture>
-      <img src="images/logo.png" alt="awsui logo" width="400">
-    </picture>
-    <br>
+  <img src="images/logo.png" alt="awsui logo" width="400">
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/awsui/"><img src="https://img.shields.io/pypi/v/awsui?color=blue" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/awsui/"><img src="https://img.shields.io/pypi/status/awsui" alt="PyPI status"></a>
-  <a href="https://pypi.org/project/awsui/"><img src="https://img.shields.io/pypi/pyversions/awsui" alt="Python versions"></a>
-  <a href="https://pypi.org/project/awsui/"><img src="https://img.shields.io/pypi/dw/awsui" alt="Downloads"></a>
-  <br>
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT license"></a>
   <a href="https://textual.textualize.io/"><img src="https://img.shields.io/badge/TUI-Textual-cyan.svg" alt="Textual"></a>
-  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
 </p>
 
 <p align="center">
@@ -22,550 +15,278 @@
   <a href="#"><img src="https://img.shields.io/badge/繁體中文-selected-blue" alt="繁體中文"></a>
 </p>
 
+<p align="center">
+  <a href="https://junminhong.github.io/awsui/">Website</a>
+</p>
+
 <h3 align="center">
-  強大且易用的 AWS Profile 與 SSO 管理終端介面工具。<br>
-  使用 <a href="https://textual.textualize.io/">Textual</a> 打造現代化、高回應性的 TUI 體驗。
+  不要再告訴你的 AI 該用哪個 AWS profile。<br>
+  讓 Claude Code、Codex、Kiro、Terraform 與任何 CLI 在正確且已驗證的 AWS context 中執行。
 </h3>
 
-<p align="center">
-  <strong>⚡ 快速</strong> • <strong>🔐 安全</strong> • <strong>🤖 AI 驅動</strong> • <strong>🌍 雙語</strong>
-</p>
+你思考的是 `dev` 或 `prod`，AWS 工具要求的卻可能是
+`company-payment-production-admin` 這種 profile 名稱。awsui 會連結兩者、驗證
+真實的 AWS account，確認無誤後才把控制權交給你的工具。
 
-## ✨ 為什麼選擇 awsui?
-- **⚡ 極速快捷**：在數十個 AWS profiles 間毫秒級搜尋與切換
-- **🔐 SSO 超簡單**：認證過期時自動重新登入 - 告別手動登入的煩惱
-- **🤖 AI 加持**：整合 Amazon Q Developer CLI，提供智慧型 AWS 協助
-- **🎯 聰明的 CLI**：內建 AWS CLI cheatsheet 的指令自動完成
-- **🌍 雙語支援**：完整支援英文與繁體中文
-- **📊 一目了然**：清楚顯示 profile 詳情、帳號資訊與當前身份
-- **🎨 現代化介面**：美觀、鍵盤導向的介面，尊重您的終端主題
+![awsui Context Dashboard](docs/images/demo01.png)
 
-## 🎬 展示
+## awsui 幫你處理什麼？
 
-<p align="center">
-  <figure>
-    <img src="images/demo01.png" alt="Profile 搜尋與切換" width="800">
-    <figcaption><i>⚡ 快速的 profile 搜尋與切換，即時過濾</i></figcaption>
-  </figure>
-</p>
+你只要選擇環境，awsui 會處理環境背後的 context：
 
-<p align="center">
-  <figure>
-    <img src="images/demo02.png" alt="AWS CLI 執行" width="800">
-    <figcaption><i>🎯 智慧 CLI，具備指令自動完成與內嵌執行</i></figcaption>
-  </figure>
-</p>
+- 你輸入的是 `prod`，不是只有這台電腦才知道的 profile 名稱。
+- 工具啟動前，你會先看到 STS 回傳的真實 account。
+- 你的 AI agent、Terraform、AWS CLI、script 與 shell 都使用同一個 context。
+- 團隊共用 account 與 region 意圖，不需要共用本機 profile 名稱。
+- 登入失敗或 account 不符時，你的指令絕對不會啟動。
 
-<p align="center">
-  <figure>
-    <img src="images/demo03.png" alt="Amazon Q AI 助手" width="800">
-    <figcaption><i>🤖 AI 驅動的 Amazon Q Developer 整合，支援串流回應</i></figcaption>
-  </figure>
-</p>
+> [!IMPORTANT]
+> awsui 提供的是已驗證的 AWS 啟動 context，不是 security sandbox。
+> Child process 仍能刻意覆蓋繼承到的環境，或明確指定其他 profile。
 
-<p align="center">
-  <figure>
-    <img src="images/demo04.png" alt="AWS CLI cheatsheet" width="800">
-    <figcaption><i>📚 內建 AWS CLI cheatsheet，15+ 項服務的快速參考</i></figcaption>
-  </figure>
-</p>
+## 跟著跑一次 awsui
 
-## 📋 功能特色
+完成下面四個步驟後，你會擁有專案 context、已驗證的 AWS identity，以及一個
+在該 context 中執行的工具。
 
-### 核心功能
-- **快速 Profile 搜尋**：依名稱、帳號、角色或區域即時模糊搜尋過濾
-- **SSO 認證**：認證過期時自動執行 `aws sso login` 或手動觸發
-- **Profile 詳情**：檢視完整的 profile 資訊，包括帳號、角色、區域與 session
+### 開始之前
 
-### AI 助手
-- **Amazon Q 整合**：使用自然語言提問
-- **情境感知**：自動包含您當前的 profile 與區域
-- **串流回應**：Q 處理查詢時的即時輸出
-- **指令建議**：取得常見任務的 AWS CLI 指令
+你需要 Python 3.13、[AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)，
+以及已透過 AWS CLI 設定的 AWS profile。建議使用 IAM Identity Center（SSO）
+進行認證。
 
-### CLI 功能
-- **指令歷史**：使用 ↑↓ 瀏覽先前的指令
-- **智慧自動完成**：從 AWS CLI cheatsheet 取得建議
-- **內嵌執行**：直接在 TUI 中執行 AWS CLI 指令
-- **輸出擷取**：查看指令結果，包含執行時間與結束代碼
-- **內建 Cheatsheet**：15+ 個 AWS 服務的快速參考
+### 1. 安裝 awsui
 
-### 開發者體驗
-- **結構化日誌**：輸出 JSON 格式日誌至 STDERR 便於除錯與監控
-- **跨平台**：Linux、macOS、Windows (PowerShell)
-- **鍵盤優先**：高效率的導航，無需使用滑鼠
-- **可擴展**：乾淨的 Python 架構便於客製化
-
-## ⚡ 快速開始
+使用 [uv](https://docs.astral.sh/uv/) 將它安裝成隔離工具：
 
 ```bash
-# 使用 uv 安裝（建議）
 uv tool install --python 3.13 awsui
-
-# 或使用 pip 安裝
-pip install awsui
-
-# 啟動 TUI
-awsui
 ```
 
-就這麼簡單！開始輕鬆管理您的 AWS profiles。🚀
-
-## 📦 需求
-
-- **Python**: >= 3.13, < 3.14
-- **AWS CLI**: v2 (必要)
-- **Amazon Q CLI**: 選用，用於 AI 協助 ([安裝指南](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line-installing.html))
-- **uv**: 建議用於相依性管理 ([安裝指南](https://docs.astral.sh/uv/))
-
-## 🚀 安裝
-
-### 方案 1：使用 uv 安裝（建議）
-
-```bash
-# 安裝為工具（隔離環境）
-uv tool install --python 3.13 awsui
-
-# 直接執行
-awsui
-```
-
-### 方案 2：使用 pip 安裝
+偏好 pip？也可以安裝到目前的 Python 環境：
 
 ```bash
 pip install awsui
-
-# 執行
-awsui
 ```
 
-### 方案 3：開發環境設定
+接著確認指令已經可以使用：
 
 ```bash
-# Clone repository
+awsui --version
+```
+
+看到 awsui 印出目前安裝的版本後，就可以開始設定專案。
+
+### 2. 設定你的專案 contexts
+
+進入專案並啟動引導式設定：
+
+```bash
+cd payment-service
+awsui init
+```
+
+awsui 會請你命名專案、加入環境、選擇或建立本機 profile，並驗證每個 identity。
+設定完成後，你會看到類似下面的摘要：
+
+```text
+Created /path/to/payment-service/.awsui.yaml
+Project: payment-service
+  dev: 111111111111 · ap-northeast-1
+  prod: 999999999999 · ap-northeast-1 · PROTECTED
+```
+
+**剛剛發生了什麼？** awsui 將團隊共用的 account 與 region 意圖寫入
+`.awsui.yaml`，但這台機器專屬的 profile binding 仍然放在 repository 外。
+
+### 3. 啟動工具前先驗證環境
+
+在啟動任何工具前，先請 awsui 顯示 `prod` 背後的真實 identity：
+
+```bash
+awsui context prod
+```
+
+純文字輸出會列出你真正需要確認的資訊：
+
+```text
+payment-service · PROD · PROTECTED
+Expected account: 999999999999
+Authenticated account: 999999999999
+Region: ap-northeast-1
+Local profile: company-payment-prod
+Status: ✓ VERIFIED
+```
+
+請確認 expected 與 authenticated account 相同。`VERIFIED` 代表 context 已準備好，
+這一步還不會啟動任何 child process。
+
+### 4. 啟動你的工具
+
+現在可以帶上任何你想使用的工具：
+
+```bash
+awsui prod -- codex
+awsui prod -- claude
+awsui prod -- terraform plan
+```
+
+啟動前一刻，awsui 會再次驗證 identity，並顯示即將交給 process 的 context：
+
+```text
+payment-service · PROD · PROTECTED
+Account: 999999999999 ✓
+Region: ap-northeast-1
+Launching: codex
+```
+
+如果登入的 account 不正確，你會看到 `AWS CONTEXT MISMATCH` 與
+`Command was not started.`，工具不會拿到錯誤的 context。
+
+這樣就完成了。想使用視覺化的 Context Dashboard 時執行 `awsui`；想開啟已驗證
+的互動 shell 時，直接執行 `awsui dev`。
+
+要讓另一位開發者加入？他只需沿用已提交的專案意圖，再將 `prod` 綁定到自己的
+本機 profile：
+
+```bash
+awsui bind prod
+awsui prod -- claude
+```
+
+## 團隊要共用什麼？
+
+團隊先決定每個環境預期的 account 與 region，再將這份共用意圖提交為
+`.awsui.yaml`：
+
+```yaml
+version: 1
+project: payment-service
+contexts:
+  dev:
+    account: "111111111111"
+    region: ap-northeast-1
+  qa:
+    account: "222222222222"
+    region: ap-northeast-1
+  staging:
+    account: "333333333333"
+    region: ap-northeast-1
+  prod:
+    account: "999999999999"
+    region: ap-northeast-1
+    protected: true
+```
+
+你的隊友會拿到相同的環境名稱與 account guardrails，但不需要知道你的 profile
+名稱。awsui 會將每台機器的 private bindings 存放在 repository 外的
+`~/.config/awsui/bindings.json`；`.awsui.yaml` 絕對不能包含 credentials。
+
+## 偏好視覺化操作？
+
+在你的專案內執行 `awsui`，就能在不呼叫 AWS 的情況下檢視所有環境，再用鍵盤
+完成驗證或啟動。Launch 與 Shell 都會在 child process 啟動前再次驗證身份。
+
+找不到專案時，**初始化**會開啟全畫面的設定 wizard。你可以命名專案、加入環境、
+選擇或建立本機 profile、透過 STS 驗證每個身份，並在寫入設定前確認結果。
+
+| 按鍵 | 動作 |
+| --- | --- |
+| `↑` / `↓` | 選擇環境 |
+| `Enter` / `v` | 登入並透過 STS 驗證 |
+| `b` | 綁定本機 profile |
+| `l` | 啟動 AI agent、CLI 或自訂指令 |
+| `s` | 開啟已驗證的 context shell |
+| `d` | 執行本機診斷 |
+| `r` | 重新載入專案與 profile 狀態 |
+| `i` | 找不到專案時進行初始化 |
+| `?` | 顯示說明 |
+| `q` | 離開 |
+
+Dashboard 會區分 `UNBOUND`、`PROFILE MISSING`、`READY TO VERIFY`、
+`VERIFYING`、`VERIFIED`、`MISMATCH` 與 `ERROR`。受保護環境會醒目顯示，
+且仍需要明確執行 launch 動作。
+
+## 偏好直接輸入指令？
+
+你也可以完全透過 command line 操作：
+
+| 指令 | 用途 |
+| --- | --- |
+| `awsui` | 開啟 Context Dashboard |
+| `awsui init` | 初始化專案的已驗證 contexts |
+| `awsui bind <environment>` | 將環境綁定到本機 AWS profile |
+| `awsui context <environment>` | 登入、驗證並顯示 context |
+| `awsui context <environment> --json` | 以 JSON 輸出已驗證的 context |
+| `awsui <environment> -- <command> [args...]` | 驗證後執行 child command |
+| `awsui <environment>` | 開啟已驗證的互動 shell |
+| `awsui doctor` | 不觸發登入，診斷本機設定 |
+
+完整命令形式仍然可用：
+
+```bash
+awsui run prod -- codex
+awsui shell prod
+```
+
+Dashboard 的自訂指令欄只接受 command 與 arguments，不接受 shell 語法。
+Pipe、redirect、`&&` 等 operator 會被拒絕；需要組合 shell 指令時，請開啟
+已驗證的 shell。
+
+## 還沒有需要的 AWS profile？
+
+初始化或綁定時，如果需要的 profile 不存在，可以選擇**建立 Profile**。
+建議優先使用 IAM Identity Center（SSO）。awsui 會將 profile 建立工作交給官方
+`aws configure sso`、`aws login` 或 `aws configure` 指令，完成後再回到
+原本的流程並選取新的 profile。
+
+也可以在開啟 awsui 前自行設定 SSO：
+
+```bash
+aws configure sso
+aws sso login --profile my-company-dev
+aws sts get-caller-identity --profile my-company-dev
+```
+
+互動流程也提供 AWS Console Login 與 access key 設定；access key 會標示為
+不建議。awsui 使用 AWS CLI 管理的 credentials，本身不會保存 AWS credentials。
+
+## 每次啟動前發生什麼事？
+
+以下是 awsui 啟動你的 process 前一定會做的事：
+
+1. 解析專案環境與本機 profile binding。
+2. 必要時登入指定 profile。
+3. 呼叫 STS `GetCallerIdentity`。
+4. 比對實際與預期的 12 位數 AWS account ID。
+5. 建立經過清理的 child environment。
+6. 僅在 account 相符時啟動 process。
+
+Account 不符與無法驗證身份都會阻擋執行。共用專案設定絕不包含 access key、
+secret key、session token 或本機 profile 名稱。
+
+## 需要協助或想參與貢獻？
+
+發現 bug、有問題，或想提出功能建議？歡迎建立
+[GitHub Issue](https://github.com/junminhong/awsui/issues)。如果你想直接完成修改，
+也歡迎提交 pull request。
+
+建立開發環境：
+
+```bash
 git clone https://github.com/junminhong/awsui.git
 cd awsui
-
-# 固定 Python 版本
-uv python install 3.13
-uv python pin 3.13
-
-# 安裝相依性
 uv sync
-
-# 從原始碼執行
-uv run awsui
 ```
 
-## 📖 使用方式
-
-### 互動模式
-
-啟動 TUI 來選擇與切換 profiles：
+提交 pull request 前請執行：
 
 ```bash
-awsui
-```
-
-**鍵盤快捷鍵：**
-
-| 分類 | 按鍵 | 功能 |
-|----------|-----|--------|
-| **🔍 導覽** | `/` | 聚焦搜尋框 |
-| | `↑` `↓` | 導覽 profiles |
-| | `Enter` | 套用選定的 profile |
-| | `Esc` | 離開輸入欄位 |
-| **💻 CLI 與工具** | `c` | 聚焦 CLI 輸入 |
-| | `a` | 切換 AI 助手面板 |
-| | `h` | 顯示 AWS CLI cheatsheet |
-| | `t` | 切換左側面板（profile 列表） |
-| **🔐 AWS** | `l` | 強制為選定的 profile 執行 SSO 登入 |
-| | `w` | 顯示當前 AWS 身份 (WhoAmI) |
-| **⚙️ 系統** | `Ctrl+L` | 清空 CLI 輸出 |
-| | `Ctrl+U` | 清空 CLI 輸入 |
-| | `?` | 顯示說明 |
-| | `q` | 離開程式 |
-
-### 預先選擇 Profile
-
-略過互動式選擇：
-
-```bash
-# 啟動 TUI 前預選特定 profile
-awsui --profile my-prod-admin
-```
-
-### 覆寫區域
-
-暫時覆寫 AWS 區域：
-
-```bash
-awsui --profile my-profile --region us-west-2
-```
-
-### 語言選擇
-
-```bash
-# 英文（預設）
-awsui --lang en
-
-# 繁體中文
-awsui --lang zh-TW
-```
-
-### 除錯模式
-
-```bash
-awsui --log-level DEBUG 2> awsui-debug.log
-```
-
-## 🤖 AI 助手（Amazon Q Developer）
-
-### 設定
-
-1. 安裝 Amazon Q Developer CLI：
-   ```bash
-   # 依循官方安裝指南
-   # https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line-installing.html
-   ```
-
-2. 驗證安裝：
-   ```bash
-   q --version
-   ```
-
-### 使用方式
-
-1. 在 awsui 中按 `a` 開啟 AI 助手面板
-2. 輸入您的問題（例如：「如何列出所有啟用加密的 S3 buckets？」）
-3. 按 `Enter` 送出
-4. 查看帶有 AWS 特定情境的串流回應
-5. 再按一次 `a` 關閉面板
-
-助手會自動包含您當前的 profile、區域與帳號情境，以提供更相關的答案。
-
-## ⚙️ AWS 設定
-
-### SSO Session 設定
-
-`~/.aws/config`：
-
-```ini
-[sso-session my-company]
-sso_start_url = https://my-company.awsapps.com/start
-sso_region = us-east-1
-sso_registration_scopes = sso:account:access
-
-[profile production-admin]
-sso_session = my-company
-sso_account_id = 111111111111
-sso_role_name = AdministratorAccess
-region = us-east-1
-output = json
-
-[profile staging-developer]
-sso_session = my-company
-sso_account_id = 222222222222
-sso_role_name = DeveloperAccess
-region = us-west-2
-output = json
-```
-
-### Assume Role 設定
-
-```ini
-[profile base]
-region = us-east-1
-
-[profile cross-account-admin]
-source_profile = base
-role_arn = arn:aws:iam::333333333333:role/AdminRole
-region = us-east-1
-```
-
-### 傳統 SSO（沒有 sso-session）
-
-```ini
-[profile legacy-sso]
-sso_start_url = https://my-company.awsapps.com/start
-sso_region = us-east-1
-sso_account_id = 444444444444
-sso_role_name = ViewOnlyAccess
-region = us-east-1
-```
-
-## 📁 專案結構
-
-```
-awsui/
-├── awsui/                      # 主套件
-│   ├── __init__.py
-│   ├── app.py                  # 主要 Textual 應用程式
-│   ├── models.py               # Profile 資料模型
-│   ├── config.py               # AWS config 解析 (~/.aws/config)
-│   ├── aws_cli.py              # AWS CLI 包裝器 (SSO, STS)
-│   ├── q_assistant.py          # Amazon Q Developer CLI 整合
-│   ├── autocomplete.py         # 指令自動完成引擎
-│   ├── command_parser.py       # AWS CLI 指令解析器
-│   ├── parameter_metadata.py   # AWS 參數 metadata 處理
-│   ├── resource_suggester.py   # AWS 資源建議引擎
-│   ├── service_model_loader.py # AWS 服務模型載入器
-│   ├── cheatsheet.py           # AWS CLI 指令參考
-│   ├── i18n.py                 # 國際化 (EN/ZH-TW)
-│   └── logging.py              # 結構化 JSON 日誌
-├── tests/                      # 測試套件
-│   ├── __init__.py
-│   ├── conftest.py             # Pytest 設定
-│   ├── test_app.py
-│   ├── test_autocomplete.py
-│   ├── test_aws_cli.py
-│   ├── test_cheatsheet.py
-│   ├── test_command_parser.py
-│   ├── test_config.py
-│   ├── test_global_parameters.py
-│   ├── test_i18n.py
-│   ├── test_logging.py
-│   ├── test_models.py
-│   ├── test_q_assistant.py
-│   ├── test_resource_suggester.py
-│   ├── test_service_model_loader.py
-│   ├── test_special_commands.py
-│   └── test_special_commands_no_autocomplete.py
-├── docs/                       # 文件網站
-│   ├── index.html
-│   ├── styles.css
-│   ├── script.js
-│   └── images/                 # 文件圖片
-├── images/                     # README 圖片
-│   ├── logo.png
-│   ├── demo01.png
-│   ├── demo02.png
-│   ├── demo03.png
-│   └── demo04.png
-├── pyproject.toml              # 專案設定
-├── uv.lock                     # 相依性鎖定檔案
-├── LICENSE                     # MIT 授權
-├── README.md                   # 英文文件
-└── README_ZH_TW.md             # 繁體中文文件
-```
-
-## 🧪 開發
-
-### 執行測試
-
-```bash
+uv run ruff check .
 uv run pytest
+uv build
 ```
 
-### 測試覆蓋率
+## 授權
 
-```bash
-uv run pytest --cov=awsui --cov-report=html
-open htmlcov/index.html
-```
-
-### 安裝開發相依性
-
-```bash
-uv sync --dev
-```
-
-### 程式碼品質
-
-```bash
-# Linting（如已設定）
-uv run ruff check awsui/
-
-# Type checking（如已設定）
-uv run mypy awsui/
-```
-
-## 🐛 疑難排解
-
-<details>
-<summary><strong>找不到 AWS CLI</strong> - <code>E_NO_AWS: AWS CLI v2 not detected</code></summary>
-
-<br>
-
-**解決方案：** 依循[官方指南](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)安裝 AWS CLI v2
-
-驗證安裝：
-```bash
-aws --version  # 應顯示 "aws-cli/2.x.x ..."
-```
-
-</details>
-
-<details>
-<summary><strong>沒有可用的 Profiles</strong> - <code>E_NO_PROFILES: No profiles detected</code></summary>
-
-<br>
-
-**解決方案：** 至少設定一個 profile：
-```bash
-# 用於 SSO
-aws configure sso-session
-
-# 用於傳統 SSO
-aws configure sso
-
-# 用於靜態憑證
-aws configure
-```
-
-</details>
-
-<details>
-<summary><strong>SSO 登入失敗</strong> - <code>E_LOGIN_FAIL: SSO login failed</code></summary>
-
-<br>
-
-**可能原因：**
-- 網路連線問題
-- 無效的 SSO start URL
-- MFA/2FA 未完成
-- 瀏覽器未開啟（檢查防火牆/權限）
-
-**解決方案：**
-```bash
-# 先嘗試手動登入
-aws sso login --profile your-profile-name
-
-# 檢查瀏覽器權限
-# 確保 port 8080-8090 範圍可用於 OAuth callback
-```
-
-</details>
-
-<details>
-<summary><strong>身份檢查失敗</strong> - <code>E_STS_FAIL: Unable to fetch identity</code></summary>
-
-<br>
-
-**可能原因：**
-- 憑證過期（SSO token 或 assume-role session）
-- 無效的 profile 設定
-- 網路/VPC 問題
-- 缺少 IAM 權限
-
-**解決方案：**
-```bash
-# 強制重新認證
-# 在 awsui 中按 'l' 觸發 SSO 登入
-
-# 驗證 profile 設定
-cat ~/.aws/config
-
-# 手動測試
-aws sts get-caller-identity --profile your-profile-name
-```
-
-</details>
-
-<details>
-<summary><strong>Amazon Q 不可用</strong> - <code>Amazon Q CLI not available</code></summary>
-
-<br>
-
-**解決方案：** 安裝 Amazon Q Developer CLI：
-```bash
-# macOS
-brew install amazon-q
-
-# 其他平台：依循官方指南
-# https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line-installing.html
-```
-
-驗證安裝：
-```bash
-q --version
-```
-
-</details>
-
-## 🔒 安全性
-
-awsui 遵循 AWS 安全最佳實踐：
-
-- ✅ **憑證處理**：僅使用 AWS CLI 的憑證系統 - 不儲存或快取憑證
-- ✅ **臨時憑證**：利用 AWS STS 與 SSO 取得短期 token
-- ✅ **唯讀設定**：僅讀取 `~/.aws/config` 和 `~/.aws/credentials` - 從不寫入
-- ✅ **日誌安全**：敏感資料（tokens、secrets）在日誌中自動遮罩
-- ✅ **環境隔離**：支援 `AWS_CONFIG_FILE` 和 `AWS_SHARED_CREDENTIALS_FILE` 用於自訂設定位置
-- ✅ **無網路呼叫**：所有 AWS 操作委派給官方 AWS CLI
-- ✅ **子程序安全**：使用適當的跳脫進行安全的子程序執行
-
-## 🎯 效能
-
-目標指標：
-
-- **啟動時間**：≤ 300ms（冷啟動）
-- **搜尋回應**：≤ 50ms（按鍵到 UI 更新）
-- **Profile 切換**：≤ 5s（包含 SSO 登入，如需要）
-
-## 🤝 貢獻
-
-歡迎貢獻！請隨時提交 issues、功能請求或 pull requests。
-
-### 貢獻指南
-
-1. Fork 此 repository
-2. 建立功能分支（`git checkout -b feature/amazing-feature`）
-3. 進行您的變更
-4. 為新功能加入測試
-5. 確保所有測試通過（`uv run pytest`）
-6. Commit 您的變更（`git commit -m 'Add amazing feature'`）
-7. Push 到分支（`git push origin feature/amazing-feature`）
-8. 開啟 Pull Request
-
-### 開發環境設定
-
-參見上方[開發](#-開發)章節。
-
-## 📄 授權
-
-此專案使用 MIT License 授權 - 詳見 [LICENSE](LICENSE) 檔案。
-
-## 🙏 致謝
-
-- [Textual](https://textual.textualize.io/) - Python 現代化 TUI 框架
-- [uv](https://docs.astral.sh/uv/) - 快速的 Python 套件安裝器與解析器
-- [AWS CLI](https://aws.amazon.com/cli/) - 官方 AWS 命令列工具
-- [Amazon Q Developer](https://aws.amazon.com/q/developer/) - AWS AI 助手
-
-## 📚 參考資料
-
-- [AWS CLI SSO Configuration](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html)
-- [AWS CLI Assume Role](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html)
-- [Textual Documentation](https://textual.textualize.io/)
-- [Amazon Q Developer CLI](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line.html)
-- [Python 3.13 Documentation](https://docs.python.org/3.13/)
-
----
-
-<h2 align="center">✨ 用 ❤️ 為 AWS 開發者打造 ✨</h2>
-
-<p align="center">
-  <strong>awsui</strong> - 讓 AWS Profile 切換變得愉快！🚀
-</p>
-
-<p align="center">
-  如果您覺得此工具有用，請考慮在 GitHub 上給它一個 ⭐！
-</p>
-
-<p align="center">
-  <a href="https://github.com/junminhong/awsui/stargazers">
-    <img src="https://img.shields.io/github/stars/junminhong/awsui?style=social" alt="GitHub stars">
-  </a>
-  <a href="https://github.com/junminhong/awsui/fork">
-    <img src="https://img.shields.io/github/forks/junminhong/awsui?style=social" alt="GitHub forks">
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/junminhong/awsui/issues">回報問題</a>
-  •
-  <a href="https://github.com/junminhong/awsui/issues">功能請求</a>
-  •
-  <a href="https://pypi.org/project/awsui/">PyPI 套件</a>
-</p>
+[MIT](LICENSE)

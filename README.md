@@ -1,20 +1,13 @@
 # awsui
+
 <p align="center">
-    <picture>
-      <img src="images/logo.png" alt="awsui logo" width="400">
-    </picture>
-    <br>
+  <img src="images/logo.png" alt="awsui logo" width="400">
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/awsui/"><img src="https://img.shields.io/pypi/v/awsui?color=blue" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/awsui/"><img src="https://img.shields.io/pypi/status/awsui" alt="PyPI status"></a>
-  <a href="https://pypi.org/project/awsui/"><img src="https://img.shields.io/pypi/pyversions/awsui" alt="Python versions"></a>
-  <a href="https://pypi.org/project/awsui/"><img src="https://img.shields.io/pypi/dw/awsui" alt="Downloads"></a>
-  <br>
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT license"></a>
   <a href="https://textual.textualize.io/"><img src="https://img.shields.io/badge/TUI-Textual-cyan.svg" alt="Textual"></a>
-  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
 </p>
 
 <p align="center">
@@ -22,551 +15,289 @@
   <a href="README_ZH_TW.md"><img src="https://img.shields.io/badge/繁體中文-available-lightgrey" alt="繁體中文"></a>
 </p>
 
+<p align="center">
+  <a href="https://junminhong.github.io/awsui/">Website</a>
+</p>
+
 <h3 align="center">
-  A powerful, user-friendly terminal interface for AWS Profile and SSO management.<br>
-  Built with <a href="https://textual.textualize.io/">Textual</a> for a modern, responsive TUI experience.
+  Stop telling your AI which AWS profile to use.<br>
+  Run Claude Code, Codex, Kiro, Terraform, and any CLI in the right verified AWS context.
 </h3>
 
-<p align="center">
-  <strong>⚡ Fast</strong> • <strong>🔐 Secure</strong> • <strong>🤖 AI-Powered</strong> • <strong>🌍 Bilingual</strong>
-</p>
+You think in environments like `dev` and `prod`. AWS tools expect profile names
+like `company-payment-production-admin`. awsui connects the two, verifies the
+real AWS account, and only then hands control to your tool.
 
-## ✨ Why awsui?
+![awsui Context Dashboard](docs/images/demo01.png)
 
-- **⚡ Lightning Fast**: Search and switch between dozens of AWS profiles in milliseconds
-- **🔐 SSO Made Easy**: Automatic re-authentication when credentials expire - no manual login headaches
-- **🤖 AI-Powered**: Integrated Amazon Q Developer CLI for intelligent AWS assistance
-- **🎯 Smart CLI**: Command autocomplete with AWS CLI cheatsheet built-in
-- **🌍 Bilingual**: Full support for English and Traditional Chinese
-- **📊 Clear Visibility**: See profile details, account info, and current identity at a glance
-- **🎨 Modern UX**: Beautiful, keyboard-driven interface that respects your terminal theme
+## What awsui does for you
 
-## 🎬 Demo
+You choose the environment. awsui takes care of the context around it:
 
-<p align="center">
-  <figure>
-    <img src="images/demo01.png" alt="Profile search and switching" width="800">
-    <figcaption><i>⚡ Fast profile search and switching with real-time filtering</i></figcaption>
-  </figure>
-</p>
+- You type `prod`, not a machine-specific profile name.
+- You see the real account returned by STS before anything starts.
+- Your AI agent, Terraform, AWS CLI, scripts, and shell all use the same context.
+- Your team shares account and region intent without sharing local profile names.
+- Your command never starts when authentication fails or the account does not match.
 
-<p align="center">
-  <figure>
-    <img src="images/demo02.png" alt="AWS CLI execution" width="800">
-    <figcaption><i>🎯 Smart CLI with command autocomplete and inline execution</i></figcaption>
-  </figure>
-</p>
+> [!IMPORTANT]
+> awsui provides a verified AWS launch context, not a security sandbox. A child
+> process can intentionally replace its inherited environment or select another
+> profile explicitly.
 
-<p align="center">
-  <figure>
-    <img src="images/demo03.png" alt="Amazon Q AI assistant" width="800">
-    <figcaption><i>🤖 AI-powered Amazon Q Developer integration with streaming responses</i></figcaption>
-  </figure>
-</p>
+## Take awsui for a first run
 
-<p align="center">
-  <figure>
-    <img src="images/demo04.png" alt="AWS CLI cheatsheet" width="800">
-    <figcaption><i>📚 Built-in AWS CLI cheatsheet with quick reference for 15+ services</i></figcaption>
-  </figure>
-</p>
+By the end of these four steps, you will have a project context, a verified AWS
+identity, and a tool running inside it.
 
-## 📋 Features
+### Before you start
 
-### Core Features
-- **Fast Profile Search**: Filter by name, account, role, or region with real-time fuzzy matching
-- **SSO Authentication**: Automatic `aws sso login` when tokens expire or on manual trigger
-- **Profile Details**: View comprehensive profile information including account, role, region, and session
+You need Python 3.13, [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html),
+and an AWS profile configured through AWS CLI. IAM Identity Center (SSO) is the
+recommended authentication method.
 
-### AI Assistant
-- **Amazon Q Integration**: Ask questions in natural language
-- **Context-Aware**: Automatically includes your current profile and region
-- **Streaming Responses**: Real-time output as Q processes your query
-- **Command Suggestions**: Get AWS CLI commands for common tasks
+### 1. Install awsui
 
-### CLI Features
-- **Command History**: Browse previous commands with ↑↓
-- **Smart Autocomplete**: Suggestions from AWS CLI cheatsheet
-- **Inline Execution**: Run AWS CLI commands directly in the TUI
-- **Output Capture**: See command results with timing and exit codes
-- **Built-in Cheatsheet**: Quick reference for 15+ AWS services
-
-### Developer Experience
-- **Structured Logging**: JSON logs to STDERR for debugging and monitoring
-- **Cross-Platform**: Linux, macOS, Windows (PowerShell)
-- **Keyboard-First**: Efficient navigation without touching the mouse
-- **Extensible**: Clean Python architecture for customization
-
-## ⚡ Quick Start
+Install it as an isolated tool with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-# Install with uv (recommended)
 uv tool install --python 3.13 awsui
-
-# Or install with pip
-pip install awsui
-
-# Launch the TUI
-awsui
 ```
 
-That's it! Start managing your AWS profiles with ease. 🚀
-
-## 📦 Requirements
-
-- **Python**: >= 3.13, < 3.14
-- **AWS CLI**: v2 (required)
-- **Amazon Q CLI**: Optional, for AI assistance ([installation guide](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line-installing.html))
-- **uv**: Recommended for dependency management ([installation guide](https://docs.astral.sh/uv/))
-
-## 🚀 Installation
-
-### Option 1: Install with uv (Recommended)
-
-```bash
-# Install as a tool (isolated environment)
-uv tool install --python 3.13 awsui
-
-# Run directly
-awsui
-```
-
-### Option 2: Install with pip
+Prefer pip? Install it in your current Python environment instead:
 
 ```bash
 pip install awsui
-
-# Run
-awsui
 ```
 
-### Option 3: Development Setup
+Now make sure the command is available:
 
 ```bash
-# Clone the repository
+awsui --version
+```
+
+If awsui prints the installed version, you are ready for the project setup.
+
+### 2. Set up your project contexts
+
+Move into your project and start the guided setup:
+
+```bash
+cd payment-service
+awsui init
+```
+
+awsui asks you to name the project, add environments, choose or create a local
+profile, and verify each identity. When setup finishes, you will see a summary
+like this:
+
+```text
+Created /path/to/payment-service/.awsui.yaml
+Project: payment-service
+  dev: 111111111111 · ap-northeast-1
+  prod: 999999999999 · ap-northeast-1 · PROTECTED
+```
+
+**What just happened?** awsui wrote the shared account and region intent to
+`.awsui.yaml`, while keeping your machine-specific profile bindings outside the
+repository.
+
+### 3. Verify the environment you are about to use
+
+Before launching anything, ask awsui to show you the real identity behind
+`prod`:
+
+```bash
+awsui context prod
+```
+
+The plain-text result contains the values that matter:
+
+```text
+payment-service · PROD · PROTECTED
+Expected account: 999999999999
+Authenticated account: 999999999999
+Region: ap-northeast-1
+Local profile: company-payment-prod
+Status: ✓ VERIFIED
+```
+
+Check that the expected and authenticated accounts match. `VERIFIED` means the
+context is ready; it does not launch a child process yet.
+
+### 4. Launch your tool
+
+Now start whichever tool you want to bring:
+
+```bash
+awsui prod -- codex
+awsui prod -- claude
+awsui prod -- terraform plan
+```
+
+Immediately before launch, awsui verifies the identity again and shows the
+context it is handing to the process:
+
+```text
+payment-service · PROD · PROTECTED
+Account: 999999999999 ✓
+Region: ap-northeast-1
+Launching: codex
+```
+
+If the authenticated account is wrong, you will see `AWS CONTEXT MISMATCH` and
+`Command was not started.` The tool never receives the incorrect context.
+
+You are set. Run `awsui` whenever you prefer the visual Context Dashboard, or
+use `awsui dev` to open a verified interactive shell.
+
+Bringing a teammate onboard? They reuse the committed project intent and bind
+`prod` to their own local profile:
+
+```bash
+awsui bind prod
+awsui prod -- claude
+```
+
+## What your team shares
+
+Your team agrees on the expected account and region for each environment, then
+commits that shared intent as `.awsui.yaml`:
+
+```yaml
+version: 1
+project: payment-service
+contexts:
+  dev:
+    account: "111111111111"
+    region: ap-northeast-1
+  qa:
+    account: "222222222222"
+    region: ap-northeast-1
+  staging:
+    account: "333333333333"
+    region: ap-northeast-1
+  prod:
+    account: "999999999999"
+    region: ap-northeast-1
+    protected: true
+```
+
+Your teammate gets the same environment names and account guardrails without
+needing your profile name. awsui stores each machine's private bindings outside
+the repository in `~/.config/awsui/bindings.json`; `.awsui.yaml` must never
+contain credentials.
+
+## Prefer a visual workflow?
+
+Run `awsui` inside your project. You can inspect every environment without
+making an AWS request, then verify or launch with the keyboard. Launch and Shell
+always verify the identity again immediately before starting the child process.
+
+When no project exists, **Initialize** opens a full-screen setup wizard. You can
+name the project, add environments, select or create local profiles, verify each
+identity with STS, and review the result before writing any configuration.
+
+| Key | Action |
+| --- | --- |
+| `↑` / `↓` | Select an environment |
+| `Enter` / `v` | Authenticate and verify with STS |
+| `b` | Bind a local profile |
+| `l` | Launch an AI agent, CLI, or custom command |
+| `s` | Open a verified context shell |
+| `d` | Run local diagnostics |
+| `r` | Reload project and profile state |
+| `i` | Initialize when no project exists |
+| `?` | Show help |
+| `q` | Quit |
+
+The Dashboard distinguishes `UNBOUND`, `PROFILE MISSING`, `READY TO VERIFY`,
+`VERIFYING`, `VERIFIED`, `MISMATCH`, and `ERROR`. Protected environments
+are visually emphasized and still require an explicit launch action.
+
+## Prefer direct commands?
+
+You can do everything from the command line too:
+
+| Command | Purpose |
+| --- | --- |
+| `awsui` | Open the Context Dashboard |
+| `awsui init` | Initialize verified contexts for a project |
+| `awsui bind <environment>` | Bind an environment to a local AWS profile |
+| `awsui context <environment>` | Authenticate, verify, and display a context |
+| `awsui context <environment> --json` | Output the verified context as JSON |
+| `awsui <environment> -- <command> [args...]` | Run a child command after verification |
+| `awsui <environment>` | Open a verified interactive shell |
+| `awsui doctor` | Diagnose local configuration without authenticating |
+
+The explicit forms remain available:
+
+```bash
+awsui run prod -- codex
+awsui shell prod
+```
+
+The Dashboard custom-command field accepts a command and arguments, not shell
+syntax. Pipes, redirects, `&&`, and other shell operators are rejected; open a
+verified shell when shell composition is required.
+
+## Need a new AWS profile?
+
+Choose **Create profile** during initialization or binding when the profile you
+need does not exist. IAM Identity Center (SSO) is the recommended first option.
+awsui delegates profile creation to the official `aws configure sso`,
+`aws login`, or `aws configure` command, then returns to the same workflow and
+selects the new profile.
+
+You can also configure SSO before opening awsui:
+
+```bash
+aws configure sso
+aws sso login --profile my-company-dev
+aws sts get-caller-identity --profile my-company-dev
+```
+
+AWS Console Login and access-key configuration are also available. Access keys
+are marked as not recommended. awsui uses credentials managed by AWS CLI and
+does not store AWS credentials itself.
+
+## What happens before every launch?
+
+Here is exactly what awsui does before it starts your process:
+
+1. Resolves the project environment and local profile binding.
+2. Authenticates the selected profile when required.
+3. Calls STS `GetCallerIdentity`.
+4. Compares the actual and expected 12-digit AWS account IDs.
+5. Builds a sanitized child environment.
+6. Starts the process only after the accounts match.
+
+Account mismatch and unverifiable identity both block execution. Shared project
+configuration never contains access keys, secret keys, session tokens, or local
+profile names.
+
+## Need help or want to contribute?
+
+Found a bug, have a question, or want to suggest a feature? Open a
+[GitHub Issue](https://github.com/junminhong/awsui/issues). If you want to build
+the change, pull requests are welcome too.
+
+Set up a development checkout:
+
+```bash
 git clone https://github.com/junminhong/awsui.git
 cd awsui
-
-# Pin Python version
-uv python install 3.13
-uv python pin 3.13
-
-# Install dependencies
 uv sync
-
-# Run from source
-uv run awsui
 ```
 
-## 📖 Usage
-
-### Interactive Mode
-
-Launch the TUI to select and switch profiles:
+Before opening a pull request, run:
 
 ```bash
-awsui
-```
-
-**Keyboard Shortcuts:**
-
-| Category | Key | Action |
-|----------|-----|--------|
-| **🔍 Navigation** | `/` | Focus search box |
-| | `↑` `↓` | Navigate profiles |
-| | `Enter` | Apply selected profile |
-| | `Esc` | Leave input field |
-| **💻 CLI & Tools** | `c` | Focus CLI input |
-| | `a` | Toggle AI assistant panel |
-| | `h` | Show AWS CLI cheatsheet |
-| | `t` | Toggle left pane (profile list) |
-| **🔐 AWS** | `l` | Force SSO login for selected profile |
-| | `w` | Show current AWS identity (WhoAmI) |
-| **⚙️ System** | `Ctrl+L` | Clear CLI output |
-| | `Ctrl+U` | Clear CLI input |
-| | `?` | Show help |
-| | `q` | Quit |
-
-### Pre-select Profile
-
-Skip interactive selection:
-
-```bash
-# Pre-select a profile when launching the TUI
-awsui --profile my-prod-admin
-```
-
-### Override Region
-
-Temporarily override AWS region:
-
-```bash
-awsui --profile my-profile --region us-west-2
-```
-
-### Language Selection
-
-```bash
-# English (default)
-awsui --lang en
-
-# Traditional Chinese
-awsui --lang zh-TW
-```
-
-### Debug Mode
-
-```bash
-awsui --log-level DEBUG 2> awsui-debug.log
-```
-
-## 🤖 AI Assistant (Amazon Q Developer)
-
-### Setup
-
-1. Install Amazon Q Developer CLI:
-   ```bash
-   # Follow official installation guide
-   # https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line-installing.html
-   ```
-
-2. Verify installation:
-   ```bash
-   q --version
-   ```
-
-### Usage
-
-1. Press `a` in awsui to open AI assistant panel
-2. Type your question (e.g., "How do I list all S3 buckets with encryption enabled?")
-3. Press `Enter` to submit
-4. View streaming response with AWS-specific context
-5. Press `a` again to close panel
-
-The assistant automatically includes your current profile, region, and account context for more relevant answers.
-
-## ⚙️ AWS Configuration
-
-### SSO Session Configuration
-
-`~/.aws/config`:
-
-```ini
-[sso-session my-company]
-sso_start_url = https://my-company.awsapps.com/start
-sso_region = us-east-1
-sso_registration_scopes = sso:account:access
-
-[profile production-admin]
-sso_session = my-company
-sso_account_id = 111111111111
-sso_role_name = AdministratorAccess
-region = us-east-1
-output = json
-
-[profile staging-developer]
-sso_session = my-company
-sso_account_id = 222222222222
-sso_role_name = DeveloperAccess
-region = us-west-2
-output = json
-```
-
-### Assume Role Configuration
-
-```ini
-[profile base]
-region = us-east-1
-
-[profile cross-account-admin]
-source_profile = base
-role_arn = arn:aws:iam::333333333333:role/AdminRole
-region = us-east-1
-```
-
-### Legacy SSO (without sso-session)
-
-```ini
-[profile legacy-sso]
-sso_start_url = https://my-company.awsapps.com/start
-sso_region = us-east-1
-sso_account_id = 444444444444
-sso_role_name = ViewOnlyAccess
-region = us-east-1
-```
-
-## 📁 Project Structure
-
-```
-awsui/
-├── awsui/                      # Main package
-│   ├── __init__.py
-│   ├── app.py                  # Main Textual application
-│   ├── models.py               # Profile data models
-│   ├── config.py               # AWS config parsing (~/.aws/config)
-│   ├── aws_cli.py              # AWS CLI wrapper (SSO, STS)
-│   ├── q_assistant.py          # Amazon Q Developer CLI integration
-│   ├── autocomplete.py         # Command autocomplete engine
-│   ├── command_parser.py       # AWS CLI command parser
-│   ├── parameter_metadata.py   # AWS parameter metadata handling
-│   ├── resource_suggester.py   # AWS resource suggestion engine
-│   ├── service_model_loader.py # AWS service model loader
-│   ├── cheatsheet.py           # AWS CLI command reference
-│   ├── i18n.py                 # Internationalization (EN/ZH-TW)
-│   └── logging.py              # Structured JSON logging
-├── tests/                      # Test suite
-│   ├── __init__.py
-│   ├── conftest.py             # Pytest configuration
-│   ├── test_app.py
-│   ├── test_autocomplete.py
-│   ├── test_aws_cli.py
-│   ├── test_cheatsheet.py
-│   ├── test_command_parser.py
-│   ├── test_config.py
-│   ├── test_global_parameters.py
-│   ├── test_i18n.py
-│   ├── test_logging.py
-│   ├── test_models.py
-│   ├── test_q_assistant.py
-│   ├── test_resource_suggester.py
-│   ├── test_service_model_loader.py
-│   ├── test_special_commands.py
-│   └── test_special_commands_no_autocomplete.py
-├── docs/                       # Documentation website
-│   ├── index.html
-│   ├── styles.css
-│   ├── script.js
-│   └── images/                 # Documentation images
-├── images/                     # README images
-│   ├── logo.png
-│   ├── demo01.png
-│   ├── demo02.png
-│   ├── demo03.png
-│   └── demo04.png
-├── pyproject.toml              # Project configuration
-├── uv.lock                     # Dependency lock file
-├── LICENSE                     # MIT License
-├── README.md                   # English documentation
-└── README_ZH_TW.md             # Traditional Chinese documentation
-```
-
-## 🧪 Development
-
-### Run Tests
-
-```bash
+uv run ruff check .
 uv run pytest
+uv build
 ```
 
-### Test Coverage
+## License
 
-```bash
-uv run pytest --cov=awsui --cov-report=html
-open htmlcov/index.html
-```
-
-### Install Dev Dependencies
-
-```bash
-uv sync --dev
-```
-
-### Code Quality
-
-```bash
-# Linting (if configured)
-uv run ruff check awsui/
-
-# Type checking (if configured)
-uv run mypy awsui/
-```
-
-## 🐛 Troubleshooting
-
-<details>
-<summary><strong>AWS CLI Not Found</strong> - <code>E_NO_AWS: AWS CLI v2 not detected</code></summary>
-
-<br>
-
-**Solution:** Install AWS CLI v2 following the [official guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-
-Verify installation:
-```bash
-aws --version  # Should show "aws-cli/2.x.x ..."
-```
-
-</details>
-
-<details>
-<summary><strong>No Profiles Available</strong> - <code>E_NO_PROFILES: No profiles detected</code></summary>
-
-<br>
-
-**Solution:** Configure at least one profile:
-```bash
-# For SSO
-aws configure sso-session
-
-# For legacy SSO
-aws configure sso
-
-# For static credentials
-aws configure
-```
-
-</details>
-
-<details>
-<summary><strong>SSO Login Fails</strong> - <code>E_LOGIN_FAIL: SSO login failed</code></summary>
-
-<br>
-
-**Possible causes:**
-- Network connectivity issues
-- Invalid SSO start URL
-- MFA/2FA not completed
-- Browser not opening (check firewall/permissions)
-
-**Solution:**
-```bash
-# Try manual login first
-aws sso login --profile your-profile-name
-
-# Check browser permissions
-# Ensure port 8080-8090 range is available for OAuth callback
-```
-
-</details>
-
-<details>
-<summary><strong>Identity Check Fails</strong> - <code>E_STS_FAIL: Unable to fetch identity</code></summary>
-
-<br>
-
-**Possible causes:**
-- Credentials expired (SSO token or assume-role session)
-- Invalid profile configuration
-- Network/VPC issues
-- Missing IAM permissions
-
-**Solution:**
-```bash
-# Force re-authentication
-# Press 'l' in awsui to trigger SSO login
-
-# Verify profile configuration
-cat ~/.aws/config
-
-# Test manually
-aws sts get-caller-identity --profile your-profile-name
-```
-
-</details>
-
-<details>
-<summary><strong>Amazon Q Not Available</strong> - <code>Amazon Q CLI not available</code></summary>
-
-<br>
-
-**Solution:** Install Amazon Q Developer CLI:
-```bash
-# macOS
-brew install amazon-q
-
-# Other platforms: follow official guide
-# https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line-installing.html
-```
-
-Verify installation:
-```bash
-q --version
-```
-
-</details>
-
-## 🔒 Security
-
-awsui follows AWS security best practices:
-
-- ✅ **Credential Handling**: Only uses AWS CLI's credential system - no credential storage or caching
-- ✅ **Temporary Credentials**: Leverages AWS STS and SSO for short-lived tokens
-- ✅ **Read-Only Config**: Only reads `~/.aws/config` and `~/.aws/credentials` - never writes
-- ✅ **Log Safety**: Sensitive data (tokens, secrets) automatically masked in logs
-- ✅ **Environment Isolation**: Supports `AWS_CONFIG_FILE` and `AWS_SHARED_CREDENTIALS_FILE` for custom config locations
-- ✅ **No Network Calls**: All AWS operations delegated to official AWS CLI
-- ✅ **Subprocess Safety**: Secure subprocess execution with proper escaping
-
-## 🎯 Performance
-
-Target metrics:
-
-- **Startup time**: ≤ 300ms (cold start)
-- **Search response**: ≤ 50ms (keystroke to UI update)
-- **Profile switch**: ≤ 5s (including SSO login if needed)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
-
-### Guidelines
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass (`uv run pytest`)
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
-
-### Development Setup
-
-See [Development](#-development) section above.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [Textual](https://textual.textualize.io/) - Modern TUI framework for Python
-- [uv](https://docs.astral.sh/uv/) - Fast Python package installer and resolver
-- [AWS CLI](https://aws.amazon.com/cli/) - Official AWS command-line tool
-- [Amazon Q Developer](https://aws.amazon.com/q/developer/) - AI-powered assistant for AWS
-
-## 📚 References
-
-- [AWS CLI SSO Configuration](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sso.html)
-- [AWS CLI Assume Role](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html)
-- [Textual Documentation](https://textual.textualize.io/)
-- [Amazon Q Developer CLI](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line.html)
-- [Python 3.13 Documentation](https://docs.python.org/3.13/)
-
----
-
-<h2 align="center">✨ Made with ❤️ for AWS Developers ✨</h2>
-
-<p align="center">
-  <strong>awsui</strong> - Making AWS Profile switching delightful! 🚀
-</p>
-
-<p align="center">
-  If you find this tool useful, please consider giving it a ⭐ on GitHub!
-</p>
-
-<p align="center">
-  <a href="https://github.com/junminhong/awsui/stargazers">
-    <img src="https://img.shields.io/github/stars/junminhong/awsui?style=social" alt="GitHub stars">
-  </a>
-  <a href="https://github.com/junminhong/awsui/fork">
-    <img src="https://img.shields.io/github/forks/junminhong/awsui?style=social" alt="GitHub forks">
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/junminhong/awsui/issues">Report Bug</a>
-  •
-  <a href="https://github.com/junminhong/awsui/issues">Request Feature</a>
-  •
-  <a href="https://pypi.org/project/awsui/">PyPI Package</a>
-</p>
+[MIT](LICENSE)
