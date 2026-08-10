@@ -1,14 +1,14 @@
 [project]
 name = "awsui"
-version = "0.1.1"
-description = "AWS Profile/SSO switching TUI built with Textual and uv"
+version = "0.2.0"
+description = "Run AI agents and CLI tools in verified project-aware AWS contexts"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 license = {text = "MIT"}
 authors = [
     {name = "junminhong (jasper)"},
 ]
-keywords = ["aws", "cli", "tui", "profile", "sso", "textual"]
+keywords = ["aws", "cli", "tui", "profile", "sso", "ai-agent", "terraform"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -22,16 +22,20 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
+    "PyYAML>=6.0.2",
+    "questionary>=2.1.1,<3",
+    "rich>=14.1.0",
+    "rich-argparse>=1.8,<2",
     "textual>=6.1.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/junminhong/awsui"
+Homepage = "https://junminhong.github.io/awsui/"
 Repository = "https://github.com/junminhong/awsui"
 "Bug Tracker" = "https://github.com/junminhong/awsui/issues"
 
 [project.scripts]
-awsui = "awsui.app:main"
+awsui = "awsui.cli:main"
 
 [build-system]
 requires = ["hatchling"]
