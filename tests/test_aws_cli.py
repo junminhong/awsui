@@ -1,15 +1,20 @@
 """Tests for AWS CLI wrapper functions."""
 
+from io import StringIO
 import json
 import subprocess
 from unittest.mock import Mock, patch
 
+import pytest
+
 
 from awsui.aws_cli import (
     check_aws_cli_available,
+    console_login,
+    get_aws_cli_info,
     get_caller_identity,
+    run_aws_interactive,
     sso_login,
-    ensure_authenticated,
     _terminate_process,
 )
 
@@ -53,6 +58,31 @@ class TestCheckAWSCLIAvailable:
         with patch("subprocess.run") as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired("aws", 5)
             assert check_aws_cli_available() is False
+
+    def test_console_login_capability_requires_aws_cli_2_32(self):
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(
+                returncode=0,
+                stdout="aws-cli/2.32.0 Python/3.13 Darwin/24 source/arm64",
+                stderr="",
+            )
+            info = get_aws_cli_info()
+
+        assert info is not None
+        assert info.version == (2, 32, 0)
+        assert info.supports_console_login is True
+
+    def test_version_can_be_reported_on_stderr(self):
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(
+                returncode=0,
+                stdout="",
+                stderr="aws-cli/2.31.9 Python/3.13",
+            )
+            info = get_aws_cli_info()
+
+        assert info is not None
+        assert info.supports_console_login is False
 
 
 class TestGetCallerIdentity:
@@ -107,6 +137,32 @@ class TestGetCallerIdentity:
             identity = get_caller_identity("test-profile")
             assert identity is None
 
+    def test_aws_cli_not_found(self):
+        """Test handling when the AWS CLI executable is unavailable."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = FileNotFoundError()
+
+            identity = get_caller_identity("test-profile")
+
+        assert identity is None
+
+    def test_explicit_environment_is_passed_to_sts(self):
+        environment = {"AWS_PROFILE": "test-profile", "PATH": "/usr/bin"}
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = Mock(
+                returncode=0,
+                stdout='{"Account": "123456789012"}',
+            )
+
+            identity = get_caller_identity(
+                "test-profile",
+                environment=environment,
+            )
+
+        assert identity == {"Account": "123456789012"}
+        assert mock_run.call_args.kwargs["env"] == environment
+        assert mock_run.call_args.kwargs["env"] is not environment
+
 
 class TestSSOLogin:
     """Tests for sso_login function."""
@@ -134,7 +190,10 @@ class TestSSOLogin:
 
     def test_login_timeout(self):
         """Test SSO login timeout."""
-        with patch("subprocess.Popen") as mock_popen, patch("time.monotonic") as mock_time:
+        with (
+            patch("subprocess.Popen") as mock_popen,
+            patch("time.monotonic") as mock_time,
+        ):
             mock_process = Mock()
             mock_process.poll.return_value = None  # Still running
             mock_popen.return_value = mock_process
@@ -177,99 +236,64 @@ class TestSSOLogin:
             result = sso_login("test-profile")
             assert result is False
 
+    def test_keyboard_interrupt_terminates_login_process(self):
+        """Test Ctrl+C terminates the AWS CLI child before propagating."""
+        with (
+            patch("subprocess.Popen") as mock_popen,
+            patch("time.sleep", side_effect=KeyboardInterrupt),
+        ):
+            mock_process = Mock()
+            mock_process.poll.return_value = None
+            mock_process.wait.return_value = None
+            mock_popen.return_value = mock_process
 
-class TestEnsureAuthenticated:
-    """Tests for ensure_authenticated function."""
+            with pytest.raises(KeyboardInterrupt):
+                sso_login("test-profile", timeout=5)
 
-    def test_already_authenticated(self):
-        """Test when profile is already authenticated."""
-        expected_identity = {
-            "Account": "123456789012",
-            "Arn": "arn:aws:iam::123456789012:user/test",
-        }
+        mock_process.terminate.assert_called_once()
+        mock_process.wait.assert_called_once_with(timeout=5)
 
-        with patch("awsui.aws_cli.get_caller_identity") as mock_identity:
-            mock_identity.return_value = expected_identity
+    def test_explicit_environment_and_output_are_passed_to_login(self):
+        environment = {"AWS_PROFILE": "test-profile"}
+        output = StringIO()
+        with patch("subprocess.Popen") as mock_popen:
+            mock_process = Mock()
+            mock_process.poll.return_value = 0
+            mock_popen.return_value = mock_process
 
-            identity = ensure_authenticated("test-profile")
-            assert identity == expected_identity
-            mock_identity.assert_called_once_with("test-profile")
+            result = sso_login(
+                "test-profile",
+                environment=environment,
+                login_output=output,
+            )
 
-    def test_needs_login_then_succeeds(self):
-        """Test authentication requiring SSO login."""
-        expected_identity = {
-            "Account": "123456789012",
-            "Arn": "arn:aws:iam::123456789012:user/test",
-        }
+        assert result is True
+        assert mock_popen.call_args.kwargs["env"] == environment
+        assert mock_popen.call_args.kwargs["env"] is not environment
+        assert mock_popen.call_args.kwargs["stdout"] is output
 
-        with patch("awsui.aws_cli.get_caller_identity") as mock_identity, patch(
-            "awsui.aws_cli.sso_login"
-        ) as mock_login:
-            # First call returns None (needs login), second returns identity
-            mock_identity.side_effect = [None, expected_identity]
-            mock_login.return_value = True
 
-            identity = ensure_authenticated("test-profile")
-            assert identity == expected_identity
-            assert mock_identity.call_count == 2
-            mock_login.assert_called_once()
+class TestConsoleLogin:
+    def test_uses_console_login_command(self):
+        with patch("awsui.aws_cli.run_aws_interactive", return_value=0) as runner:
+            assert console_login("console-dev") is True
 
-    def test_login_fails(self):
-        """Test when SSO login fails."""
-        with patch("awsui.aws_cli.get_caller_identity") as mock_identity, patch(
-            "awsui.aws_cli.sso_login"
-        ) as mock_login:
-            mock_identity.return_value = None
-            mock_login.return_value = False
+        runner.assert_called_once_with(
+            ["aws", "login", "--profile", "console-dev"],
+            cancel_check=None,
+            timeout=300,
+            poll_interval=0.5,
+            environment=None,
+            output=None,
+        )
 
-            identity = ensure_authenticated("test-profile")
-            assert identity is None
+    def test_interactive_runner_returns_child_exit_code(self):
+        with patch("subprocess.Popen") as mock_popen:
+            process = Mock()
+            process.poll.return_value = 7
+            mock_popen.return_value = process
 
-    def test_cancelled_before_check(self):
-        """Test cancellation before identity check."""
-        def cancel_check():
-            return True
-
-        identity = ensure_authenticated("test-profile", cancel_check=cancel_check)
-        assert identity is None
-
-    def test_cancelled_after_check(self):
-        """Test cancellation after initial identity check."""
-        cancel_calls = [False, True, False]
-        call_index = 0
-
-        def cancel_check():
-            nonlocal call_index
-            result = cancel_calls[call_index]
-            call_index += 1
-            return result
-
-        with patch("awsui.aws_cli.get_caller_identity") as mock_identity:
-            mock_identity.return_value = None
-
-            identity = ensure_authenticated("test-profile", cancel_check=cancel_check)
-            assert identity is None
-
-    def test_cancelled_during_login(self):
-        """Test cancellation during SSO login."""
-        with patch("awsui.aws_cli.get_caller_identity") as mock_identity, patch(
-            "awsui.aws_cli.sso_login"
-        ) as mock_login:
-            mock_identity.return_value = None
-            mock_login.return_value = True
-
-            # Cancel after login succeeds
-            cancel_calls = [False, False, True]
-            call_index = 0
-
-            def cancel_check():
-                nonlocal call_index
-                result = cancel_calls[call_index]
-                call_index += 1
-                return result
-
-            identity = ensure_authenticated("test-profile", cancel_check=cancel_check)
-            assert identity is None
+            assert run_aws_interactive(["aws", "configure"]) == 7
 
 
 class TestTerminateProcess:
