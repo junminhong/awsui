@@ -1,1600 +1,1069 @@
-"""Main Textual application and entry point."""
+"""Project-aware Textual dashboard for verified AWS contexts."""
 
+from collections.abc import Mapping, Sequence
+from datetime import datetime
 import os
-import subprocess
-from argparse import ArgumentParser
-from threading import Event
-from typing import List
-from time import time
+from pathlib import Path
+import shlex
+import sys
 
-from textual.app import App, ComposeResult
-from textual.screen import Screen
-from textual.widgets import (
-    Header,
-    Footer,
-    Input,
-    ListView,
-    ListItem,
-    Static,
-    RichLog,
-)
-from textual.containers import Container, Vertical, Horizontal, VerticalScroll
-from textual.binding import Binding
-from textual.reactive import reactive
-from textual.worker import Worker
-from textual.timer import Timer
-from textual import events, work
-from rich.console import Group
+from rich.console import Group, RenderableType
 from rich.table import Table
-
-from .config import parse_profiles
-from .models import Profile
-from .aws_cli import check_aws_cli_available, ensure_authenticated, sso_login
-from .logging import get_logger
-from .autocomplete import CommandAutocomplete
-from .q_assistant import (
-    check_q_cli_available,
-    stream_q_cli_query,
-    clean_ansi_codes,
-    format_aws_context,
+from rich.text import Text
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Horizontal, HorizontalScroll, Vertical, VerticalScroll
+from textual.screen import ModalScreen
+from textual.widgets import (
+    Button,
+    Input,
+    ListItem,
+    ListView,
+    Select,
+    Static,
 )
-from .cheatsheet import AWS_CLI_CHEATSHEET, AWS_CLI_COMMANDS, COMMAND_CATEGORIES
-from .i18n import LANG_ZH_TW, LANG_EN
+
+from .bind_command import BindCommandCancelled, BindCommandError, bind_environment
+from .bindings import LocalBindingsError
+from .cli_console import CliConsole, safe_text
+from .cli_presenter import (
+    DoctorRenderStyles,
+    render_doctor_report_rich,
+    render_launch_context,
+    render_launch_context_rich,
+    render_status_rich,
+)
+from .command_runner import CommandLaunchError, run_command, select_interactive_shell
+from .context_engine import ContextResolutionError
+from .context_runtime import VerifiedRuntime, prepare_context_runtime
+from .context_verification import (
+    AccountMismatchError,
+    ContextVerificationError,
+    VerifiedContext,
+    describe_principal,
+)
+from .doctor_command import diagnose
+from .i18n import LANG_EN, LANG_ZH_TW
+from .init_screen import InitializationScreen, InitScreenOutcome
+from .logging import get_logger
+from .profile_catalog import ProfileCatalogError
+from .project_config import (
+    ProjectConfigError,
+    ProjectConfigNotFoundError,
+)
+from .project_initialization import ProjectInitializationError
+from .tui_context import (
+    ContextItem,
+    ContextStatus,
+    DashboardSnapshot,
+    DetectedTool,
+    LaunchCommandError,
+    detect_tools,
+    load_dashboard,
+    parse_launch_command,
+)
+from .tui_theme import AWSUI_GRAPHITE_THEME, TUI_RICH_STYLES
 
 
-def parse_args():
-    """Parse command-line arguments."""
-    parser = ArgumentParser(prog="awsui", description="AWS Profile/SSO switcher TUI")
+_STATUS_PRESENTATION = {
+    ContextStatus.UNBOUND: ("!", "status_unbound", "warning"),
+    ContextStatus.PROFILE_MISSING: ("!", "status_profile_missing", "error"),
+    ContextStatus.READY: ("○", "status_ready", "primary"),
+    ContextStatus.VERIFYING: ("◌", "status_verifying", "primary"),
+    ContextStatus.VERIFIED: ("✓", "status_verified", "success"),
+    ContextStatus.MISMATCH: ("✗", "status_mismatch", "error"),
+    ContextStatus.ERROR: ("✗", "status_error", "error"),
+}
 
-    parser.add_argument("--profile", help="Pre-select profile by name")
-    parser.add_argument("--region", help="Override AWS region")
-    parser.add_argument(
-        "--lang",
-        choices=["zh-TW", "en"],
-        default="en",
-        help="UI language (default: en)",
-    )
-    parser.add_argument(
-        "--log-level",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        default="INFO",
-        help="Logging level (default: INFO)",
-    )
-
-    return parser.parse_args()
+_TUI_DOCTOR_STYLES = DoctorRenderStyles(
+    value=TUI_RICH_STYLES.value,
+    muted=TUI_RICH_STYLES.muted,
+    success=TUI_RICH_STYLES.success,
+    error=TUI_RICH_STYLES.error,
+    option=TUI_RICH_STYLES.primary,
+    title=TUI_RICH_STYLES.title,
+    healthy_border=TUI_RICH_STYLES.success,
+    unhealthy_border=TUI_RICH_STYLES.error,
+)
 
 
-class CheatsheetScreen(Screen):
-    """Modal screen for displaying AWS CLI cheatsheet."""
+class ContextList(ListView):
+    """Environment list whose labels reflect session verification state."""
+
+    def set_contexts(
+        self,
+        contexts: Sequence[ContextItem],
+        statuses: Mapping[str, ContextStatus],
+        translations: Mapping[str, str],
+    ) -> None:
+        renderables = [
+            self._render_context(
+                context,
+                statuses.get(context.name, context.status),
+                translations,
+            )
+            for context in contexts
+        ]
+        existing_items = list(self.children)
+        existing_names = [item.name for item in existing_items]
+        expected_names = [context.name for context in contexts]
+        if existing_names == expected_names:
+            for item, renderable in zip(existing_items, renderables, strict=True):
+                item.query_one(Static).update(renderable)
+            return
+
+        self.clear()
+        for context, renderable in zip(contexts, renderables, strict=True):
+            self.append(ListItem(Static(renderable), name=context.name))
+
+    @staticmethod
+    def _render_context(
+        context: ContextItem,
+        status: ContextStatus,
+        translations: Mapping[str, str],
+    ) -> Text:
+        """Render one environment row without changing ListView selection."""
+        symbol, label_key, style_name = _STATUS_PRESENTATION[status]
+        status_style = getattr(TUI_RICH_STYLES, style_name)
+        label = translations[label_key]
+        body = Text()
+        body.append(f"{symbol} ", style=status_style)
+        body.append(context.name.upper(), style=TUI_RICH_STYLES.title)
+        if context.protected:
+            body.append(
+                f" · {translations['protected']}",
+                style=TUI_RICH_STYLES.protected,
+            )
+        body.append("\n")
+        body.append(label, style=status_style)
+        if context.profile:
+            body.append(f" · {context.profile}", style=TUI_RICH_STYLES.muted)
+        return body
+
+
+class InformationScreen(ModalScreen[None]):
+    """Simple modal for Doctor and keyboard help renderables."""
 
     CSS = """
-    CheatsheetScreen {
-        layout: vertical;
-        background: rgba(0, 0, 0, 0.75);
+    InformationScreen {
         align: center middle;
+        background: $background 88%;
     }
-
-    #cheatsheet-container {
-        width: 90%;
-        max-width: 160;
-        height: 90%;
+    #information-card {
+        width: 80;
+        max-width: 92%;
+        height: auto;
+        max-height: 82%;
+        padding: 1 2;
+        border: solid $border;
         background: $surface;
-        border: thick $primary;
-        padding: 2;
-        layout: vertical;
-        align-horizontal: left;
-        align-vertical: top;
     }
-
-    #cheatsheet-title {
-        text-align: center;
+    #information-title {
+        height: 2;
+        color: $text;
+        text-style: bold;
     }
-
-    #cheatsheet-content {
-        height: 1fr;
-        width: 100%;
+    #information-scroll { height: auto; max-height: 24; }
+    #information-content { height: auto; color: $text; }
+    #information-actions {
+        height: 2;
+        margin-top: 1;
+        align-horizontal: right;
     }
-
-    #cheatsheet-body {
-        width: 100%;
+    #information-close {
+        width: auto;
+        min-width: 9;
+        height: 1;
+        padding: 0 1;
+        border: none;
+        background: $panel;
+        color: $text-muted;
+    }
+    #information-close:hover, #information-close:focus {
+        background: $primary-muted;
+        color: $text;
     }
     """
 
     BINDINGS = [
-        ("escape", "close", "Close"),
-        ("q", "close", "Close"),
+        Binding("escape", "close", "Close"),
+        Binding("q", "close", "Close"),
     ]
 
+    def __init__(
+        self,
+        title: str,
+        renderable: RenderableType,
+        *,
+        close_label: str,
+    ) -> None:
+        super().__init__()
+        self.modal_title = title
+        self.renderable = renderable
+        self.close_label = close_label
+
     def compose(self) -> ComposeResult:
-        """Compose the cheatsheet modal."""
-        with Container(id="cheatsheet-container"):
-            title = self.app.lang["cheatsheet_title"]
-            dismiss = self.app.lang["cheatsheet_dismiss"]
-            yield Static(
-                f"[bold cyan]{title}[/bold cyan]\n[dim]{dismiss}[/dim]",
-                id="cheatsheet-title",
-            )
-            with VerticalScroll(id="cheatsheet-content"):
-                content = ""
-                for category, commands in AWS_CLI_CHEATSHEET.items():
-                    content += f"\n[bold yellow]{category}:[/bold yellow]\n"
-                    for cmd in commands:
-                        content += f"  [green]{cmd}[/green]\n"
-                yield Static(content, id="cheatsheet-body")
+        with Vertical(id="information-card"):
+            yield Static(self.modal_title, id="information-title")
+            with VerticalScroll(id="information-scroll"):
+                yield Static(self.renderable, id="information-content")
+            with Horizontal(id="information-actions"):
+                yield Button(
+                    self.close_label,
+                    id="information-close",
+                    compact=True,
+                    flat=True,
+                )
 
     def action_close(self) -> None:
-        """Close the cheatsheet and return to main screen."""
-        self.app.pop_screen()
+        self.dismiss()
+
+    def on_button_pressed(self, _event: Button.Pressed) -> None:
+        self.dismiss()
 
 
-class RegionInputScreen(Screen):
-    """Modal screen for region override input."""
+class LaunchScreen(ModalScreen[str | None]):
+    """Detected-tool selector plus editable direct-argv command input."""
 
     CSS = """
-    RegionInputScreen {
-        layout: vertical;
-        background: rgba(0, 0, 0, 0.75);
+    LaunchScreen {
         align: center middle;
+        background: $background 88%;
     }
-
-    #region-container {
-        width: 60;
+    #launch-card {
+        width: 76;
+        max-width: 92%;
         height: auto;
+        padding: 1 2;
+        border: solid $border;
         background: $surface;
-        border: thick $primary;
-        padding: 2;
-        layout: vertical;
     }
-
-    #region-title {
-        text-align: center;
-        margin-bottom: 1;
-    }
-
-    #region-hint {
+    #launch-title { text-style: bold; color: $text; margin-bottom: 1; }
+    #launch-warning { color: $text-warning; margin-bottom: 1; }
+    #launch-tools, #launch-command { margin-bottom: 1; }
+    #launch-tools:focus, #launch-command:focus { border: tall $primary; }
+    #launch-actions { height: auto; align-horizontal: right; }
+    #launch-actions Button {
+        width: auto;
+        min-width: 9;
+        height: 1;
+        margin-left: 1;
+        padding: 0 1;
+        border: none;
+        background: transparent;
         color: $text-muted;
-        text-align: center;
-        margin-bottom: 1;
     }
-
-    #region-input {
-        margin-bottom: 1;
+    #launch-actions Button:hover, #launch-actions Button:focus {
+        background: $panel;
+        color: $text;
     }
+    #launch-confirm { color: $text-primary; }
+    #launch-confirm:hover, #launch-confirm:focus { background: $primary-muted; }
     """
 
-    BINDINGS = [
-        ("escape", "cancel", "Cancel"),
-    ]
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    def __init__(
+        self,
+        environment: str,
+        tools: Sequence[DetectedTool],
+        *,
+        protected: bool,
+        translations: Mapping[str, str] = LANG_EN,
+    ) -> None:
+        super().__init__()
+        self.environment = environment
+        self.tools = tuple(tools)
+        self.protected = protected
+        self.translations = translations
 
     def compose(self) -> ComposeResult:
-        """Compose the region input modal."""
-        with Container(id="region-container"):
+        options = [(tool.label, tool.executable) for tool in self.tools]
+        options.append((self.translations["launch_custom"], ""))
+        initial = self.tools[0].executable if self.tools else ""
+        with Vertical(id="launch-card"):
             yield Static(
-                f"[bold cyan]{self.app.lang['region_input_title']}[/bold cyan]",
-                id="region-title",
+                self.translations["launch_title"].format(
+                    environment=self.environment.upper()
+                ),
+                id="launch-title",
             )
-            yield Static(
-                f"[dim]{self.app.lang['region_input_hint']}[/dim]",
-                id="region-hint",
+            warning = Static(
+                self.translations["launch_warning"],
+                id="launch-warning",
+            )
+            warning.display = self.protected
+            yield warning
+            yield Select(
+                options,
+                value=initial,
+                allow_blank=False,
+                compact=True,
+                id="launch-tools",
             )
             yield Input(
-                placeholder=self.app.lang["region_input_placeholder"],
-                id="region-input",
+                value=initial,
+                placeholder=self.translations["launch_placeholder"],
+                id="launch-command",
             )
+            with Horizontal(id="launch-actions"):
+                yield Button(
+                    self.translations["action_cancel"],
+                    id="launch-cancel",
+                    compact=True,
+                    flat=True,
+                )
+                yield Button(
+                    self.translations["action_verify_launch"],
+                    id="launch-confirm",
+                    compact=True,
+                    flat=True,
+                )
 
     def on_mount(self) -> None:
-        """Focus input when screen is mounted."""
-        self.query_one("#region-input", Input).focus()
+        self.query_one("#launch-command", Input).focus()
+
+    def on_select_changed(self, event: Select.Changed) -> None:
+        if isinstance(event.value, str):
+            command = self.query_one("#launch-command", Input)
+            command.value = event.value
+            command.cursor_position = len(event.value)
+            command.focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Handle input submission."""
-        region = event.value.strip()
-        self.dismiss(region if region else None)
+        self.dismiss(event.value.strip() or None)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "launch-cancel":
+            self.dismiss(None)
+            return
+        command = self.query_one("#launch-command", Input).value.strip()
+        self.dismiss(command or None)
 
     def action_cancel(self) -> None:
-        """Cancel and close the dialog."""
         self.dismiss(None)
 
 
-class ProfileList(ListView):
-    """Custom ListView for profiles with filtering."""
+class AWSUIApp(App[None]):
+    """Keyboard-first dashboard for project AWS environments."""
 
-    def __init__(self, profiles: List[Profile], *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.all_profiles = profiles
-        self.filtered_profiles = profiles.copy()
-
-    def filter_profiles(self, query: str):
-        """Filter profiles by search query."""
-        if not query:
-            self.filtered_profiles = self.all_profiles.copy()
-        else:
-            query_lower = query.lower()
-            self.filtered_profiles = [
-                p
-                for p in self.all_profiles
-                if query_lower in p["name"].lower()
-                or (p["account"] and query_lower in p["account"])
-                or (p["role"] and query_lower in p["role"].lower())
-                or (p["region"] and query_lower in p["region"].lower())
-            ]
-
-        self.refresh_items()
-
-    def refresh_items(self):
-        """Refresh list items based on filtered profiles."""
-        self.clear()
-        for profile in self.filtered_profiles:
-            title = f"[b]{profile['name']}[/b]"
-            meta_parts: list[str] = []
-
-            kind = profile.get("kind")
-            if kind:
-                meta_parts.append(kind.upper())
-            account = profile.get("account")
-            if account:
-                meta_parts.append(str(account))
-            role = profile.get("role")
-            if role:
-                meta_parts.append(role)
-            region = profile.get("region")
-            if region:
-                meta_parts.append(region)
-
-            body_text = title
-            if meta_parts:
-                meta_line = " | ".join(meta_parts)
-                body_text += f"\n[dim]{meta_line}[/dim]"
-
-            item_body = Static(body_text, markup=True, expand=True)
-            item = ListItem(item_body, name=profile["name"])
-            item.add_class("profile-list-item")
-            self.append(item)
-
-
-class AWSUIApp(App):
-    MOUSE = False
-    TITLE = "AWSUI"
-    """Textual TUI application for AWS profile switching."""
-
+    TITLE = "awsui"
     CSS = """
     Screen {
         layout: vertical;
-        background: #0f172a;
-        color: #e2e8f0;
+        background: $background;
+        color: $text;
     }
-
-    Header {
-        background: #0b1628;
-        color: #f8fafc;
-        text-style: bold;
-    }
-
-    Footer {
-        background: #0b1628;
-        color: #94a3b8;
-    }
-
-    #content {
-        layout: horizontal;
-        height: 1fr;
-        padding: 0;
-    }
-
-    #left-pane {
-        width: 30%;
-        min-width: 25;
-        max-width: 45;
-        padding: 1 2 1 2;
-        background: #0b1420;
-        border-right: solid #1e293b;
-    }
-
-    #right-pane {
-        layout: vertical;
-        width: 1fr;
-        padding: 0 1 0 1;
-        background: #0f172a;
-    }
-
-    .section-title {
-        text-style: bold;
-        color: #38bdf8;
-        background: #0d1926;
-        padding: 0 1;
-        margin-bottom: 1;
-    }
-
-    .section-spacing {
-        margin-top: 1;
-    }
-
-    .section-hint {
-        color: #64748b;
-        text-style: italic;
-        padding: 0 1;
-        margin-bottom: 1;
-    }
-
-    #search {
+    #top-bar {
         height: 3;
-        margin-bottom: 1;
-        border: tall $primary-darken-2;
-        background: #0d1a2a;
+        padding: 0 2;
+        align-vertical: middle;
+        background: $background;
+        border-bottom: solid $border;
     }
-
-    #search:focus {
-        border: tall $primary;
-        background: #102339;
+    #brand {
+        width: auto;
+        color: $text;
+        text-style: bold;
+        margin-right: 2;
     }
-
-    #profile-list {
+    #breadcrumb { width: 1fr; color: $text-muted; }
+    #product-label { width: auto; color: $text-muted; }
+    #dashboard { height: 1fr; layout: horizontal; }
+    #context-pane {
+        width: 34%;
+        min-width: 26;
+        max-width: 46;
+        padding: 1 1 0 1;
+        border-right: solid $border;
+        background: $background;
+    }
+    #environment-heading {
+        height: 2;
+        margin: 0 1;
+        color: $text-muted;
+        text-style: bold;
+    }
+    #context-list {
         height: 1fr;
-        width: 1fr;
-        overflow-y: auto;
-        border: solid #1e293b;
-        background: #0a1018;
+        border: none;
+        background: $background;
     }
-
-    #profile-list > .list-item {
-        margin: 0 1 1 1;
-        padding: 1;
-        border: solid transparent;
+    #context-list > ListItem {
+        height: 3;
+        padding: 0 1;
+        border-left: thick transparent;
         background: transparent;
     }
-
-    #profile-list > .list-item:last-child {
-        margin-bottom: 0;
+    #context-list > ListItem.-highlight {
+        border-left: thick $primary;
+        background: $panel;
+        color: $text;
     }
-
-    #profile-list > .list-item--highlight {
-        border: solid $primary;
-        background: $primary 20%;
-    }
-
     #detail-pane {
-        margin-top: 1;
-        padding: 0;
         width: 1fr;
-        min-height: 8;
-        max-height: 14;
-        overflow-y: auto;
-        overflow-x: auto;
-        scrollbar-size: 1 1;
-        border: solid #1f2d44;
-        background: #15263f;
+        padding: 1 2;
+        background: $background;
     }
-
     #detail-content {
-        padding: 1;
-        color: #e2e8f0;
-        text-align: left;
-    }
-
-    #ai-status {
-        height: auto;
-        margin: 0 0 0 0;
-    }
-
-    /* Output area (shared by CLI and AI) */
-    #output-area {
         height: 1fr;
+        padding: 2 3;
+        background: $surface;
+    }
+    #action-bar {
+        height: 2;
         padding: 0 1;
-        margin-bottom: 1;
-        background: #0a1018;
-        border: solid #1e293b;
+        align-vertical: middle;
+        background: $surface;
+        border-top: solid $border;
+        scrollbar-size: 0 0;
     }
-
-    /* Input container */
-    #input-container {
-        layout: vertical;
-        height: auto;
+    #action-bar Button {
+        width: auto;
+        min-width: 0;
+        height: 1;
+        padding: 0 1;
+        border: none;
+        background: transparent;
+        color: $text-muted;
+        text-style: none;
     }
-
-    #autocomplete {
+    #action-bar Button:hover, #action-bar Button:focus {
+        background: $panel;
+        color: $text;
+    }
+    #verify, #launch { color: $text-primary; }
+    #initialize { color: $text-primary; }
+    #action-bar Button:disabled {
         display: none;
-        max-height: 10;
-        padding: 0;
-        margin-bottom: 1;
-        background: #0f1f33;
-        border: solid $warning-darken-1;
-    }
-
-    #autocomplete > .list-item {
-        padding: 0 1;
-    }
-
-    #autocomplete > .list-item--highlight {
-        background: $warning 30%;
-    }
-
-    #shared-input {
-        height: 3;
-        border: tall $primary-darken-2;
-        background: #0d1a2a;
-    }
-
-    #shared-input:focus {
-        border: tall $primary;
-        background: #102339;
-    }
-
-    .input-cli-mode {
-        border: tall $success-darken-2;
-    }
-
-    .input-cli-mode:focus {
-        border: tall $success;
-    }
-
-    .input-ai-mode {
-        border: tall $warning-darken-2;
-    }
-
-    .input-ai-mode:focus {
-        border: tall $warning;
-    }
-
-    Toast {
-        width: 26;
-        min-width: 20;
-        padding: 0 1;
-    }
-
-    Toast .toast--title {
-        text-style: bold;
-    }
-
-    .empty-state {
-        width: 100%;
-        content-align: center middle;
-        text-align: center;
-        color: #64748b;
-        padding: 2;
-    }
-
-    .status-indicator {
-        color: #38bdf8;
-        padding: 0 1;
     }
     """
 
     BINDINGS = [
-        Binding("/", "focus_search", "Search", show=True),
-        Binding("c", "focus_cli", "CLI", show=True),
-        Binding("a", "toggle_ai_panel", "AI", show=True),
-        Binding("t", "toggle_left_pane", "Toggle", show=True),
-        Binding("h", "show_cheatsheet", "Cheat", show=True),
-        Binding("enter", "apply_profile", "Apply", show=True),
-        Binding("l", "force_login", "Login", show=True),
-        Binding("ctrl+c", "cancel_login", "Cancel", show=True),
-        Binding("w", "whoami", "WhoAmI", show=True),
-        Binding("r", "region_override", "Region", show=True),
-        Binding("ctrl+l", "clear_cli", "Clear", show=False),
-        Binding("escape", "blur_input", "Esc", show=True),
+        Binding("v", "verify_context", "Verify", show=True),
+        Binding("b", "bind_context", "Bind", show=True),
+        Binding("l", "launch", "Launch", show=True),
+        Binding("s", "open_shell", "Shell", show=True),
+        Binding("d", "doctor", "Doctor", show=True),
+        Binding("r", "reload", "Reload", show=True),
+        Binding("i", "initialize", "Init", show=False),
         Binding("?", "show_help", "Help", show=True),
         Binding("q", "quit", "Quit", show=True),
     ]
 
-    show_left_pane: reactive[bool] = reactive(True)
-    active_tab: reactive[str] = reactive("cli")
-
     def __init__(
         self,
         lang: str = "en",
-        profile: str | None = None,
-        region: str | None = None,
         log_level: str = "INFO",
+        *,
+        start_dir: Path | None = None,
+        bindings_path: Path | None = None,
+        base_environment: Mapping[str, str] | None = None,
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
+        self.register_theme(AWSUI_GRAPHITE_THEME)
+        self.theme = AWSUI_GRAPHITE_THEME.name
         self.lang = LANG_ZH_TW if lang == "zh-TW" else LANG_EN
-        self.sub_title = self.lang["app_subtitle"]
-        self.preselect_profile = profile
-        self.override_region = region
         self.logger = get_logger(log_level)
-        self.profiles: List[Profile] = []
-        self.selected_profile: Profile | None = None
-
-        self.q_available: bool = False
-
-        self.ai_spinner_frames: list[str] = ["⏳", "⌛", "🔄"]
-        self.ai_spinner_index: int = 0
-        self.ai_spinner_message: str = ""
-        self.ai_spinner_timer: Timer | None = None
-        self.ai_status_clear_timer: Timer | None = None
-
-        self.command_history: List[str] = []
-        self.history_index: int = -1
-        self.current_input: str = ""
-        self.browsing_history: bool = False
-        self._autocomplete_handled_enter: bool = False
-
-        self.auth_worker: Worker | None = None
-        self.auth_worker_active: bool = False
-        self.auth_cancel_event: Event | None = None
-        self.authenticating_profile: Profile | None = None
-        self.authenticating_fetch_identity: bool = False
+        self.start_dir = Path.cwd() if start_dir is None else Path(start_dir)
+        self.bindings_path = bindings_path
+        self.base_environment = dict(
+            os.environ if base_environment is None else base_environment
+        )
+        self.snapshot: DashboardSnapshot | None = None
+        self.selected_environment: str | None = None
+        self.statuses: dict[str, ContextStatus] = {}
+        self.verified: dict[str, VerifiedContext] = {}
+        self.verified_at: dict[str, datetime] = {}
+        self.actual_accounts: dict[str, str] = {}
+        self.errors: dict[str, str] = {}
+        self.load_error: str | None = None
+        self.tools = detect_tools(self.base_environment)
 
     def compose(self) -> ComposeResult:
-        """Compose the application layout."""
-        yield Header(show_clock=True)
-
-        with Horizontal(id="content"):
-            with Vertical(id="left-pane"):
-                yield Static(self.lang["panel_profiles"], classes="section-title")
-
-                yield Input(placeholder=self.lang["search_placeholder"], id="search")
-
-                yield ProfileList(self.profiles, id="profile-list")
-
+        with Horizontal(id="top-bar"):
+            yield Static("awsui", id="brand")
+            yield Static(id="breadcrumb")
+            yield Static(self._text("topbar_product"), id="product-label")
+        with Horizontal(id="dashboard"):
+            with Vertical(id="context-pane"):
                 yield Static(
-                    self.lang["panel_detail"],
-                    classes="section-title section-spacing",
+                    self._text("environment_heading"), id="environment-heading"
                 )
-                detail_placeholder = Static(
-                    self.lang["detail_placeholder"],
-                    id="detail-content",
-                )
-                detail_placeholder.add_class("empty-state")
-                with VerticalScroll(id="detail-pane"):
-                    yield detail_placeholder
+                yield ContextList(id="context-list")
+            with Vertical(id="detail-pane"):
+                yield Static(id="detail-content")
+        with HorizontalScroll(id="action-bar"):
+            yield self._action_button("i", "action_initialize", "initialize")
+            yield self._action_button("b", "action_bind", "bind")
+            yield self._action_button("v", "action_verify", "verify")
+            yield self._action_button("l", "action_launch", "launch")
+            yield self._action_button("s", "action_shell", "shell")
+            yield self._action_button("d", "action_doctor", "doctor")
+            yield self._action_button("r", "action_reload", "reload")
+            yield self._action_button("?", "action_help", "help")
+            yield self._action_button("q", "action_quit", "quit")
 
-            with Vertical(id="right-pane"):
-                yield RichLog(id="output-area", highlight=True, markup=True)
-
-                with Vertical(id="input-container"):
-                    yield CommandAutocomplete(
-                        AWS_CLI_COMMANDS, COMMAND_CATEGORIES, id="autocomplete"
-                    )
-
-                    ai_status = Static("", id="ai-status", classes="status-indicator")
-                    ai_status.display = False
-                    yield ai_status
-
-                    yield Input(
-                        placeholder=self.lang["cli_placeholder"],
-                        id="shared-input",
-                        classes="input-cli-mode",
-                    )
-
-        yield Footer()
-
-    def on_mount(self):
-        """Initialize app after mounting."""
-        start_time = time()
-
-        self.q_available = check_q_cli_available()
-        self.logger.info("q_cli_check", available=self.q_available)
-
-        self.active_tab = "cli"
-
-        if not check_aws_cli_available():
-            self.update_status(self.lang["no_aws_cli"], error=True)
-            self.show_empty_state(self.lang["no_aws_cli"], self.lang["no_aws_cli_hint"])
-            return
-
-        self.profiles = parse_profiles()
-        self.logger.info("profiles_loaded", count=len(self.profiles))
-
-        if not self.profiles:
-            self.update_status(self.lang["no_profiles"], error=True)
-            self.show_empty_state(
-                self.lang["no_profiles"], self.lang["no_profiles_hint"]
-            )
-            return
-
-        profile_list = self.query_one("#profile-list", ProfileList)
-        profile_list.all_profiles = self.profiles
-        profile_list.filtered_profiles = self.profiles.copy()
-        profile_list.refresh_items()
-
-        if self.preselect_profile:
-            for i, p in enumerate(self.profiles):
-                if p["name"] == self.preselect_profile:
-                    profile_list.index = i
-                    self.selected_profile = p
-                    self.update_detail_pane(p)
-                    break
-
-        duration_ms = int((time() - start_time) * 1000)
-        self.logger.info("app_started", duration_ms=duration_ms)
-        self.update_status(
-            self.lang["profiles_loaded"].format(count=len(self.profiles))
+    def _action_button(self, key: str, label_key: str, button_id: str) -> Button:
+        return Button(
+            f"{key}  {self._text(label_key)}",
+            id=button_id,
+            compact=True,
+            flat=True,
         )
 
-    def show_empty_state(self, title: str, hint: str):
-        """Show empty state message."""
-        detail_content = self.query_one("#detail-content", Static)
-        detail_content.update(f"[bold]{title}[/bold]\n\n{hint}")
-        detail_content.add_class("empty-state")
+    def _text(self, key: str, **values: object) -> str:
+        return self.lang[key].format(**values)
 
-    def update_status(self, message: str, error: bool = False):
-        """Display status notification."""
+    def on_mount(self) -> None:
+        self.reload_dashboard()
+        if self.snapshot is not None:
+            self.query_one("#context-list", ContextList).focus()
+        elif not self.load_error:
+            self.query_one("#initialize", Button).focus()
+
+    def reload_dashboard(self) -> None:
+        """Reload local dashboard state without making AWS calls."""
+        previous = self.selected_environment
+        try:
+            snapshot = load_dashboard(
+                start_dir=self.start_dir,
+                bindings_path=self.bindings_path,
+            )
+        except ProjectConfigNotFoundError:
+            self.snapshot = None
+            self.load_error = None
+            self.selected_environment = None
+            self.statuses.clear()
+            self._render_onboarding()
+            return
+        except (ProjectConfigError, LocalBindingsError, ProfileCatalogError) as exc:
+            self.snapshot = None
+            self.load_error = str(exc)
+            self.selected_environment = None
+            self.statuses.clear()
+            self._render_load_error()
+            return
+
+        self.snapshot = snapshot
+        self.load_error = None
+        self.sub_title = snapshot.project
+        self.statuses = {item.name: item.status for item in snapshot.contexts}
+        self.verified.clear()
+        self.verified_at.clear()
+        self.actual_accounts.clear()
+        self.errors.clear()
+        available = {item.name for item in snapshot.contexts}
+        self.selected_environment = (
+            previous if previous in available else snapshot.contexts[0].name
+        )
+        self._refresh_context_list()
+        self._render_selected_context()
+        self.logger.info(
+            "dashboard_loaded",
+            project=snapshot.project,
+            contexts=len(snapshot.contexts),
+        )
+
+    def _refresh_context_list(self) -> None:
+        context_list = self.query_one("#context-list", ContextList)
+        if self.snapshot is None:
+            context_list.clear()
+            return
+        context_list.set_contexts(self.snapshot.contexts, self.statuses, self.lang)
+        selected_index = next(
+            (
+                index
+                for index, item in enumerate(self.snapshot.contexts)
+                if item.name == self.selected_environment
+            ),
+            0,
+        )
+        context_list.index = selected_index
+        selected_environment = self.selected_environment
+        if selected_environment is not None:
+            self.call_after_refresh(
+                self._restore_context_selection,
+                selected_environment,
+            )
+        breadcrumb = Text(
+            f"{self.snapshot.project}  ·  {self.snapshot.config_path.name}",
+            style=TUI_RICH_STYLES.muted,
+        )
+        breadcrumb.stylize(
+            TUI_RICH_STYLES.title,
+            0,
+            len(self.snapshot.project),
+        )
+        self.query_one("#breadcrumb", Static).update(breadcrumb)
+
+    def _restore_context_selection(self, environment: str) -> None:
+        """Restore selection after ListView has mounted its replacement rows."""
+        if self.snapshot is None:
+            return
+        selected_index = next(
+            (
+                index
+                for index, item in enumerate(self.snapshot.contexts)
+                if item.name == environment
+            ),
+            0,
+        )
+        self.query_one("#context-list", ContextList).index = selected_index
+
+    def _selected_item(self) -> ContextItem | None:
+        if self.snapshot is None or self.selected_environment is None:
+            return None
+        return self.snapshot.get(self.selected_environment)
+
+    def _render_selected_context(self) -> None:
+        item = self._selected_item()
+        if item is None:
+            if self.load_error:
+                self._render_load_error()
+            else:
+                self._render_onboarding()
+            return
+
+        status = self.statuses.get(item.name, item.status)
+        symbol, label_key, style_name = _STATUS_PRESENTATION[status]
+        status_style = getattr(TUI_RICH_STYLES, style_name)
+        label = self._text(label_key)
+        grid = Table.grid(padding=(0, 2))
+        grid.add_column(style=TUI_RICH_STYLES.label, no_wrap=True)
+        grid.add_column(style=TUI_RICH_STYLES.value)
+        grid.add_row(
+            self._text("field_environment"),
+            safe_text(item.name.upper(), TUI_RICH_STYLES.value),
+        )
+        grid.add_row(
+            self._text("field_expected_account"),
+            safe_text(item.expected_account, TUI_RICH_STYLES.value),
+        )
+        grid.add_row(
+            self._text("field_region"),
+            safe_text(item.region, TUI_RICH_STYLES.value),
+        )
+        grid.add_row(
+            self._text("field_local_profile"),
+            safe_text(item.profile or "—", TUI_RICH_STYLES.value),
+        )
+
+        verified = self.verified.get(item.name)
+        actual_account = (
+            verified.actual_account
+            if verified is not None
+            else self.actual_accounts.get(item.name)
+        )
+        if actual_account:
+            grid.add_row(
+                self._text("field_actual_account"),
+                safe_text(actual_account, TUI_RICH_STYLES.value),
+            )
+        if verified is not None:
+            principal = describe_principal(verified.principal_arn)
+            if principal is not None:
+                principal_key = {
+                    "Role": "field_role",
+                    "User": "field_user",
+                    "Principal": "field_principal",
+                }[principal[0]]
+                grid.add_row(
+                    self._text(principal_key),
+                    safe_text(principal[1], TUI_RICH_STYLES.value),
+                )
+            verified_time = (
+                self.verified_at[item.name].astimezone().strftime("%H:%M:%S")
+            )
+            grid.add_row(
+                self._text("field_last_verified"),
+                safe_text(verified_time, TUI_RICH_STYLES.value),
+            )
+
+        status_text = Text.assemble(
+            (f"{symbol} ", status_style),
+            (label, status_style),
+        )
+        guidance = self._context_guidance(item, status)
+        heading = Text(item.name.upper(), style=TUI_RICH_STYLES.title)
+        if item.protected:
+            heading.append(
+                f" · {self._text('protected')}",
+                style=TUI_RICH_STYLES.protected,
+            )
+        body: list[RenderableType] = [heading, Text(), grid, Text(), status_text]
+        if guidance:
+            body.extend([Text(), safe_text(guidance, TUI_RICH_STYLES.muted)])
+        error = self.errors.get(item.name)
         if error:
-            self.notify(
-                message, severity="error", title=self.lang.get("error_title", "Error")
+            body.extend(
+                [
+                    Text(),
+                    Text.assemble(
+                        ("│ ", TUI_RICH_STYLES.error),
+                        safe_text(error, TUI_RICH_STYLES.error),
+                    ),
+                ]
             )
-        else:
-            self.notify(message, severity="information")
+        self.query_one("#detail-content", Static).update(Group(*body))
+        self._update_actions(item)
 
-    def _start_ai_spinner(self, message: str) -> None:
-        """Begin animated status indicator for Amazon Q queries."""
-        if self.ai_spinner_timer:
-            self.ai_spinner_timer.stop()
-            self.ai_spinner_timer = None
-        if self.ai_status_clear_timer:
-            self.ai_status_clear_timer.stop()
-            self.ai_status_clear_timer = None
-
-        self.ai_spinner_message = message
-        self.ai_spinner_index = 0
-
-        ai_status = self.query_one("#ai-status", Static)
-        ai_status.display = True
-        frame = self.ai_spinner_frames[self.ai_spinner_index]
-        ai_status.update(f"[dim]{frame} {message}[/dim]")
-
-        def tick() -> None:
-            self.ai_spinner_index = (self.ai_spinner_index + 1) % len(
-                self.ai_spinner_frames
-            )
-            current = self.ai_spinner_frames[self.ai_spinner_index]
-            ai_status.update(f"[dim]{current} {self.ai_spinner_message}[/dim]")
-
-        self.ai_spinner_timer = self.set_interval(0.45, tick)
-
-    def _clear_ai_status(self) -> None:
-        """Clear the Amazon Q status indicator."""
-        ai_status = self.query_one("#ai-status", Static)
-        ai_status.update("")
-        ai_status.display = False
-
-    def _stop_ai_spinner(self, message: str | None, success: bool = True) -> None:
-        """Stop spinner and optionally show final message."""
-        if self.ai_spinner_timer:
-            self.ai_spinner_timer.stop()
-            self.ai_spinner_timer = None
-
-        if self.ai_status_clear_timer:
-            self.ai_status_clear_timer.stop()
-            self.ai_status_clear_timer = None
-
-        if message:
-            icon = "✅" if success else "⚠️"
-            ai_status = self.query_one("#ai-status", Static)
-            ai_status.display = True
-            ai_status.update(f"{icon} {message}")
-            self.ai_status_clear_timer = self.set_timer(3.0, self._clear_ai_status)
-        else:
-            self._clear_ai_status()
-
-    def build_profile_detail(self, profile: Profile) -> Table:
-        """Create a Rich table summarizing profile information."""
-        table = Table.grid(padding=(0, 1))
-        table.expand = True
-        table.pad_edge = False
-        table.add_column(justify="left", style="bold cyan", no_wrap=True)
-        table.add_column(justify="left", no_wrap=True)
-
-        def fmt(value: str | None, transform=None) -> str:
-            if value is None or value == "":
-                return "-"
-            if transform:
-                return transform(value)
-            return str(value)
-
-        table.add_row(self.lang["detail_name"], fmt(profile.get("name")))
-        table.add_row(
-            self.lang["detail_kind"],
-            fmt(profile.get("kind"), lambda value: str(value).upper()),
-        )
-        table.add_row(self.lang["detail_account"], fmt(profile.get("account")))
-        table.add_row(self.lang["detail_role"], fmt(profile.get("role")))
-
-        # Show region with override indicator if applicable
-        if self.override_region:
-            region_label = self.lang["detail_region_override"]
-            region_value = self.override_region
-        else:
-            region_label = self.lang["detail_region"]
-            region_value = fmt(profile.get("region"))
-        table.add_row(region_label, region_value)
-
-        table.add_row(self.lang["detail_session"], fmt(profile.get("session")))
-
-        return table
-
-    def build_identity_detail(self, identity: dict) -> Table:
-        """Create a Rich table summarizing identity details."""
-        table = Table.grid(padding=(0, 1))
-        table.expand = True
-        table.pad_edge = False
-        table.add_column(justify="left", style="bold yellow", no_wrap=True)
-        table.add_column(justify="left", no_wrap=True)
-
-        table.add_row(f"[b]{self.lang['whoami']}[/b]", "")
-        table.add_row(self.lang["whoami_account"], identity.get("Account") or "-")
-        table.add_row(self.lang["whoami_arn"], identity.get("Arn") or "-")
-        table.add_row(self.lang["whoami_user"], identity.get("UserId") or "-")
-
-        return table
-
-    def update_detail_pane(self, profile: Profile):
-        """Update detail pane with profile information."""
-        detail_content = self.query_one("#detail-content", Static)
-        detail_content.remove_class("empty-state")
-        detail_content.update(self.build_profile_detail(profile))
-
-    def on_key(self, event: events.Key) -> None:
-        """Handle global key events when Input has focus."""
-        focused = self.focused
-        if not isinstance(focused, Input):
-            return
-
-        if focused.id == "shared-input":
-            autocomplete = self.query_one("#autocomplete", CommandAutocomplete)
-
-            if event.key == "ctrl+u":
-                focused.value = ""
-                self.browsing_history = False
-                self.history_index = -1
-                autocomplete.display = False
-                autocomplete.clear_options()
-                event.prevent_default()
-                event.stop()
-                return
-
-            # Case 1: Browsing history → ↑↓ continues history navigation
-            if self.browsing_history:
-                if event.key == "up":
-                    self.navigate_history_up(focused)
-                    event.prevent_default()
-                    event.stop()
-                    return
-                elif event.key == "down":
-                    self.navigate_history_down(focused)
-                    event.prevent_default()
-                    event.stop()
-                    return
-                elif event.key not in ["up", "down"]:
-                    self.browsing_history = False
-
-            # Case 2: Input is empty → ↑↓ starts history navigation
-            input_is_empty = not focused.value.strip()
-            if input_is_empty:
-                if event.key == "up":
-                    self.navigate_history_up(focused)
-                    event.prevent_default()
-                    event.stop()
-                    return
-                elif event.key == "down":
-                    self.navigate_history_down(focused)
-                    event.prevent_default()
-                    event.stop()
-                    return
-
-            # Case 3: Input has content + autocomplete visible → ↑↓ for autocomplete, Tab/Enter to select
-            elif autocomplete.display:
-                if event.key == "up":
-                    autocomplete.move_cursor_up()
-                    event.prevent_default()
-                    event.stop()
-                    return
-                elif event.key == "down":
-                    autocomplete.move_cursor_down()
-                    event.prevent_default()
-                    event.stop()
-                    return
-                elif event.key == "tab":
-                    selected = autocomplete.get_selected_command()
-                    if selected:
-                        current_value = focused.value
-                        cursor_pos = focused.cursor_position
-
-                        new_value, new_cursor_pos = autocomplete.smart_insert_selection(
-                            current_value, cursor_pos, selected
-                        )
-
-                        focused.value = new_value
-                        focused.cursor_position = new_cursor_pos
-                        autocomplete.display = False
-                        autocomplete.clear_options()
-                        event.prevent_default()
-                        event.stop()
-                        return
-                elif event.key == "enter":
-                    selected = autocomplete.get_selected_command()
-                    if selected:
-                        current_value = focused.value
-                        cursor_pos = focused.cursor_position
-
-                        new_value, new_cursor_pos = autocomplete.smart_insert_selection(
-                            current_value, cursor_pos, selected
-                        )
-
-                        focused.value = new_value
-                        focused.cursor_position = new_cursor_pos
-                        autocomplete.display = False
-                        autocomplete.clear_options()
-                        self._autocomplete_handled_enter = True
-                        event.prevent_default()
-                        event.stop()
-                        return
-                elif event.key == "escape":
-                    autocomplete.display = False
-                    autocomplete.clear_options()
-                    event.prevent_default()
-                    event.stop()
-                    return
-
-            # Case 4: Input has content but no autocomplete → ↑↓ for history navigation
-            else:
-                if event.key == "up":
-                    self.navigate_history_up(focused)
-                    event.prevent_default()
-                    event.stop()
-                    return
-                elif event.key == "down":
-                    self.navigate_history_down(focused)
-                    event.prevent_default()
-                    event.stop()
-                    return
-
-        if event.key == "escape":
-            profile_list = self.query_one("#profile-list", ProfileList)
-            profile_list.focus()
-            event.prevent_default()
-            event.stop()
-            return
-
-        if event.key == "q":
-            self.action_quit()
-            event.prevent_default()
-            event.stop()
-            return
-
-        if event.key == "question_mark":
-            self.action_show_help()
-            event.prevent_default()
-            event.stop()
-            return
-
-        if event.key == "ctrl+l":
-            self.action_clear_cli()
-            event.prevent_default()
-            event.stop()
-            return
-
-    def on_input_changed(self, event: Input.Changed):
-        """Handle search input changes and CLI autocomplete."""
-        if event.input.id == "search":
-            profile_list = self.query_one("#profile-list", ProfileList)
-            profile_list.filter_profiles(event.value)
-        elif event.input.id == "shared-input":
-            autocomplete = self.query_one("#autocomplete", CommandAutocomplete)
-
-            if self.browsing_history:
-                if self.history_index != -1 and self.history_index < len(
-                    self.command_history
-                ):
-                    expected_value = self.command_history[self.history_index]
-                    if event.value != expected_value:
-                        self.browsing_history = False
-                        self.history_index = -1
-                        self.current_input = ""
-                        cursor_pos = event.input.cursor_position
-                        autocomplete.filter_commands(event.value, cursor_pos)
-                return
-
-            if self.active_tab == "cli":
-                cursor_pos = event.input.cursor_position
-                autocomplete.filter_commands(event.value, cursor_pos)
-            else:
-                autocomplete.display = False
-
-    def on_input_submitted(self, event: Input.Submitted):
-        """Handle Enter key in search box and CLI input."""
-        if event.input.id == "search":
-            profile_list = self.query_one("#profile-list", ProfileList)
-
-            # Check if there are filtered results
-            if profile_list.filtered_profiles:
-                # If only one result, apply it directly
-                if len(profile_list.filtered_profiles) == 1:
-                    profile_list.index = 0
-                    self.selected_profile = profile_list.filtered_profiles[0]
-                    self.update_detail_pane(self.selected_profile)
-                    # Directly apply the single result
-                    self.action_apply_profile()
-                else:
-                    # Multiple results: select first and move focus to list
-                    profile_list.index = 0
-                    self.selected_profile = profile_list.filtered_profiles[0]
-                    self.update_detail_pane(self.selected_profile)
-                    profile_list.focus()
-                    self.notify(
-                        self.lang["search_first_result"].format(
-                            count=len(profile_list.filtered_profiles)
-                        )
-                    )
-            else:
-                self.notify(self.lang["search_no_results"], severity="warning")
-
-        elif event.input.id == "shared-input":
-            # Check if autocomplete just handled this Enter key
-            # (the flag is set in on_key before this event fires)
-            if self._autocomplete_handled_enter:
-                self._autocomplete_handled_enter = False
-                return
-
-            value = event.value.strip()
-            if value:
-                if self.active_tab == "cli":
-                    self.execute_aws_command(value)
-                elif self.active_tab == "ai":
-                    self.execute_q_query(value)
-                event.input.value = ""
-
-    def on_list_view_selected(self, event: ListView.Selected):
-        """Handle profile selection."""
-        profile_list = self.query_one("#profile-list", ProfileList)
-        selected_index = profile_list.index
-
-        if 0 <= selected_index < len(profile_list.filtered_profiles):
-            self.selected_profile = profile_list.filtered_profiles[selected_index]
-            self.update_detail_pane(self.selected_profile)
-
-    def action_focus_search(self):
-        """Focus on search input."""
-        search_input = self.query_one("#search", Input)
-        search_input.focus()
-
-    def action_blur_input(self):
-        """Leave current Input and return to profile list."""
-        profile_list = self.query_one("#profile-list", ProfileList)
-        profile_list.focus()
-
-    def action_toggle_left_pane(self):
-        """Toggle visibility of left pane (profile list)."""
-        self.show_left_pane = not self.show_left_pane
-
-    def watch_show_left_pane(self, show: bool) -> None:
-        """React to changes in left pane visibility."""
-        try:
-            left_pane = self.query_one("#left-pane", Vertical)
-            left_pane.display = show
-
-            if show:
-                self.screen.remove_class("fullscreen")
-                self.notify(self.lang["left_pane_shown"])
-            else:
-                self.screen.add_class("fullscreen")
-                self.notify(self.lang["cli_fullscreen"])
-        except Exception:
-            pass
-
-    def action_toggle_ai_panel(self):
-        """Switch to AI tab."""
-        if not self.q_available:
-            self.update_status(self.lang["ai_not_available"], error=True)
-            return
-        self.active_tab = "ai"
-        # Always focus input, even if already in AI mode
-        try:
-            shared_input = self.query_one("#shared-input", Input)
-            shared_input.focus()
-        except Exception:
-            pass
-
-    def action_focus_cli(self):
-        """Switch to CLI tab and focus input."""
-        self.active_tab = "cli"
-        # Always focus input, even if already in CLI mode
-        try:
-            shared_input = self.query_one("#shared-input", Input)
-            shared_input.focus()
-        except Exception:
-            pass
-
-    def watch_active_tab(self, tab: str) -> None:
-        """React to mode changes (CLI or AI)."""
-        try:
-            shared_input = self.query_one("#shared-input", Input)
-            autocomplete = self.query_one("#autocomplete", CommandAutocomplete)
-
-            if tab == "cli":
-                shared_input.set_classes("input-cli-mode")
-                shared_input.placeholder = self.lang["cli_placeholder"]
-                autocomplete.display = False
-
-                self.notify(self.lang["cli_mode"])
-                shared_input.focus()
-
-            elif tab == "ai":
-                shared_input.set_classes("input-ai-mode")
-                shared_input.placeholder = self.lang["ai_placeholder"]
-                autocomplete.display = False
-                autocomplete.clear_options()
-
-                if not self.q_available:
-                    output_area = self.query_one("#output-area", RichLog)
-                    output_area.write(
-                        f"\n[bold yellow]{self.lang['ai_not_available']}[/bold yellow]"
-                    )
-                    output_area.write(f"[dim]{self.lang['ai_install_hint']}[/dim]")
-                    output_area.write(
-                        "[cyan]https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/command-line-installing.html[/cyan]\n"
-                    )
-
-                self.notify(self.lang["ai_mode"])
-                shared_input.focus()
-
-        except Exception:
-            pass
-
-    def action_apply_profile(self):
-        """Apply the selected profile."""
-        if not self.selected_profile:
-            self.update_status(self.lang["select_profile_first"], error=True)
-            return
-
-        profile = self.selected_profile
-        self.update_status(self.lang["authenticating"])
-        self._start_login(profile, fetch_identity=True)
-
-    def _start_login(self, profile: Profile, fetch_identity: bool) -> None:
-        """Kick off background SSO login/authentication."""
-        if self.auth_worker_active:
-            self.update_status(self.lang["login_in_progress"])
-            return
-
-        cancel_event = Event()
-        profile_snapshot = profile.copy()
-
-        self.auth_worker_active = True
-        self.auth_cancel_event = cancel_event
-        self.authenticating_profile = profile_snapshot
-        self.authenticating_fetch_identity = fetch_identity
-        self.auth_worker = self.perform_login(
-            profile_snapshot, fetch_identity, cancel_event
-        )
-
-    @work(exclusive=True, thread=True)
-    def perform_login(
-        self, profile: Profile, fetch_identity: bool, cancel_event: Event
-    ):
-        """Run authentication or login logic in a worker thread."""
-        profile_name = profile["name"]
-        start_time = time()
-        identity = None
-        success = False
-
-        if fetch_identity:
-            identity = ensure_authenticated(
-                profile_name, cancel_check=cancel_event.is_set
-            )
-            success = identity is not None
-        else:
-            success = sso_login(profile_name, cancel_check=cancel_event.is_set)
-
-        duration_ms = int((time() - start_time) * 1000)
-        cancelled = cancel_event.is_set()
-
-        self.call_from_thread(
-            self._finish_login,
-            profile,
-            identity,
-            success,
-            duration_ms,
-            cancelled,
-            fetch_identity,
-        )
-
-    def _finish_login(
+    def _context_guidance(
         self,
-        profile: Profile,
-        identity: dict | None,
-        success: bool,
-        duration_ms: int,
-        cancelled: bool,
-        fetch_identity: bool,
+        item: ContextItem,
+        status: ContextStatus,
+    ) -> str:
+        if status is ContextStatus.UNBOUND:
+            return self._text("guidance_unbound", environment=item.name)
+        if status is ContextStatus.PROFILE_MISSING:
+            return self._text("guidance_profile_missing")
+        if status is ContextStatus.READY:
+            return self._text("guidance_ready")
+        if status is ContextStatus.VERIFYING:
+            return self._text("guidance_verifying")
+        if status is ContextStatus.VERIFIED:
+            return self._text(
+                "guidance_verified",
+                project=self.snapshot.project,
+                environment=item.name,
+            )
+        if status is ContextStatus.MISMATCH:
+            return self._text("guidance_mismatch")
+        return self._text("guidance_error")
+
+    def _render_onboarding(self) -> None:
+        self.sub_title = self._text("subtitle_no_project")
+        self._refresh_context_list()
+        body = Group(
+            Text(
+                self._text("onboarding_missing"),
+                style=TUI_RICH_STYLES.warning,
+            ),
+            Text(),
+            Text(self._text("onboarding_body"), style=TUI_RICH_STYLES.value),
+            Text(),
+            Text(self._text("onboarding_next"), style=TUI_RICH_STYLES.primary),
+        )
+        self.query_one("#breadcrumb", Static).update(
+            Text(self._text("subtitle_no_project"), style=TUI_RICH_STYLES.muted)
+        )
+        self.query_one("#detail-content", Static).update(body)
+        self._update_actions(None)
+
+    def _render_load_error(self) -> None:
+        self.sub_title = self._text("subtitle_configuration_error")
+        self._refresh_context_list()
+        body = Group(
+            Text(self._text("load_error_heading"), style=TUI_RICH_STYLES.error),
+            Text(),
+            safe_text(
+                self.load_error or self._text("load_error_unknown"),
+                TUI_RICH_STYLES.value,
+            ),
+            Text(),
+            Text(self._text("load_error_next"), style=TUI_RICH_STYLES.primary),
+        )
+        self.query_one("#breadcrumb", Static).update(
+            Text(
+                self._text("subtitle_configuration_error"),
+                style=TUI_RICH_STYLES.error,
+            )
+        )
+        self.query_one("#detail-content", Static).update(body)
+        self._update_actions(None)
+
+    def _update_actions(self, item: ContextItem | None) -> None:
+        has_project = self.snapshot is not None
+        runnable = item is not None and item.status is ContextStatus.READY
+        self.query_one("#initialize", Button).display = (
+            not has_project and not self.load_error
+        )
+        self.query_one("#doctor", Button).display = True
+        self.query_one("#reload", Button).display = True
+        self.query_one("#help", Button).display = True
+        self.query_one("#quit", Button).display = True
+        self.query_one("#bind", Button).display = has_project
+        self.query_one("#verify", Button).display = runnable
+        self.query_one("#launch", Button).display = runnable
+        self.query_one("#shell", Button).display = runnable
+        self.query_one("#bind", Button).disabled = item is None
+        self.query_one("#verify", Button).disabled = False
+        self.query_one("#launch", Button).disabled = False
+        self.query_one("#shell", Button).disabled = False
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        if event.item is None or event.item.name is None:
+            return
+        self.selected_environment = event.item.name
+        self._render_selected_context()
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        if event.item.name is not None:
+            self.selected_environment = event.item.name
+        self.action_verify_context()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        actions = {
+            "initialize": self.action_initialize,
+            "doctor": self.action_doctor,
+            "bind": self.action_bind_context,
+            "verify": self.action_verify_context,
+            "launch": self.action_launch,
+            "shell": self.action_open_shell,
+            "reload": self.action_reload,
+            "help": self.action_show_help,
+            "quit": self.action_quit,
+        }
+        action = actions.get(event.button.id or "")
+        if action is not None:
+            action()
+
+    def action_reload(self) -> None:
+        self.tools = detect_tools(self.base_environment)
+        self.reload_dashboard()
+        self.notify(self._text("notification_reloaded"), severity="information")
+
+    def action_initialize(self) -> None:
+        if self.snapshot is not None or self.load_error is not None:
+            return
+        try:
+            screen = InitializationScreen(
+                start_dir=self.start_dir,
+                bindings_path=self.bindings_path,
+                base_environment=self.base_environment,
+                translations=self.lang,
+            )
+        except ProjectInitializationError as exc:
+            self.notify(
+                str(exc),
+                severity="error",
+                title=self._text("notification_init_failed"),
+            )
+            return
+        self.push_screen(screen, self._initialization_result)
+
+    def _initialization_result(self, outcome: InitScreenOutcome | None) -> None:
+        if outcome is None:
+            self.notify(
+                self._text("notification_init_cancelled"),
+                severity="warning",
+            )
+            return
+        self.reload_dashboard()
+        if outcome.warning is not None:
+            self.notify(
+                outcome.warning,
+                severity="error",
+                title=self._text("notification_init_failed"),
+            )
+            return
+        self.notify(self._text("notification_initialized"), severity="information")
+
+    def action_bind_context(self) -> None:
+        item = self._selected_item()
+        if item is None:
+            return
+        try:
+            with self.suspend():
+                bind_environment(
+                    item.name,
+                    start_dir=self.start_dir,
+                    bindings_path=self.bindings_path,
+                )
+        except (BindCommandCancelled, KeyboardInterrupt):
+            self.notify(self._text("notification_bind_cancelled"), severity="warning")
+            return
+        except BindCommandError as exc:
+            self.notify(
+                str(exc),
+                severity="error",
+                title=self._text("notification_bind_failed"),
+            )
+            return
+        self.reload_dashboard()
+        self.notify(
+            self._text("notification_bound", environment=item.name),
+            severity="information",
+        )
+
+    def action_doctor(self) -> None:
+        report = diagnose(
+            start_dir=self.start_dir,
+            bindings_path=self.bindings_path,
+        )
+        self.push_screen(
+            InformationScreen(
+                self._text("doctor_title"),
+                render_doctor_report_rich(
+                    report,
+                    styles=_TUI_DOCTOR_STYLES,
+                    framed=False,
+                ),
+                close_label=self._text("action_close"),
+            )
+        )
+
+    def action_show_help(self) -> None:
+        help_text = Text.from_markup(self._text("help_text"))
+        self.push_screen(
+            InformationScreen(
+                self._text("help_title"),
+                help_text,
+                close_label=self._text("action_close"),
+            )
+        )
+
+    def action_verify_context(self) -> None:
+        item = self._selected_item()
+        if item is None or item.status is not ContextStatus.READY:
+            return
+        self._verify_and_maybe_launch(item, None)
+
+    def action_launch(self) -> None:
+        item = self._selected_item()
+        if item is None or item.status is not ContextStatus.READY:
+            return
+        self.push_screen(
+            LaunchScreen(
+                item.name,
+                self.tools,
+                protected=item.protected,
+                translations=self.lang,
+            ),
+            self._launch_result,
+        )
+
+    def _launch_result(self, command: str | None) -> None:
+        if command is None:
+            return
+        try:
+            argv = parse_launch_command(command)
+        except LaunchCommandError as exc:
+            self.notify(
+                str(exc),
+                severity="error",
+                title=self._text("notification_invalid_command"),
+            )
+            return
+        item = self._selected_item()
+        if item is not None:
+            self._verify_and_maybe_launch(item, argv)
+
+    def action_open_shell(self) -> None:
+        item = self._selected_item()
+        if item is None or item.status is not ContextStatus.READY:
+            return
+        self._verify_and_maybe_launch(item, ())
+
+    def _verify_and_maybe_launch(
+        self,
+        item: ContextItem,
+        command: tuple[str, ...] | None,
     ) -> None:
-        """Handle completion of background login/authentication."""
-        profile_name = profile["name"]
-
-        self.auth_worker = None
-        self.auth_worker_active = False
-        self.auth_cancel_event = None
-        self.authenticating_profile = None
-        self.authenticating_fetch_identity = False
-
-        if cancelled:
-            if fetch_identity:
-                self.logger.info(
-                    "authentication_cancelled",
-                    profile=profile_name,
-                    duration_ms=duration_ms,
-                )
-                self.update_status(self.lang["auth_cancelled"])
-            else:
-                self.logger.info(
-                    "sso_login_cancelled", profile=profile_name, duration_ms=duration_ms
-                )
-                self.update_status(self.lang["login_cancelled"])
-            return
-
-        if fetch_identity:
-            if success and identity:
-                self.logger.info(
-                    "authentication_success",
-                    profile=profile_name,
-                    duration_ms=duration_ms,
-                    account=identity.get("Account"),
-                    arn=identity.get("Arn"),
-                )
-                self.update_status(self.lang["auth_success"])
-
-                # Update detail pane with profile info
-                if (
-                    self.selected_profile
-                    and self.selected_profile["name"] == profile_name
-                ):
-                    detail_content = self.query_one("#detail-content", Static)
-                    detail_content.remove_class("empty-state")
-                    renderables = [self.build_profile_detail(profile)]
-                    if identity:
-                        renderables.append(self.build_identity_detail(identity))
-
-                    detail_content.update(
-                        Group(*renderables) if len(renderables) > 1 else renderables[0]
-                    )
-            else:
-                self.logger.error(
-                    "authentication_failed",
-                    profile=profile_name,
-                    duration_ms=duration_ms,
-                )
-                self.update_status(self.lang["auth_failed"], error=True)
-        else:
-            if success:
-                self.logger.info(
-                    "sso_login_success", profile=profile_name, duration_ms=duration_ms
-                )
-                self.update_status(self.lang["login_success"])
-            else:
-                self.logger.error(
-                    "sso_login_failed", profile=profile_name, duration_ms=duration_ms
-                )
-                self.update_status(self.lang["login_failed"], error=True)
-
-    def action_force_login(self):
-        """Force SSO login for selected profile."""
-        if not self.selected_profile:
-            self.update_status(self.lang["select_profile_first"], error=True)
-            return
-
-        profile = self.selected_profile
-        profile_name = profile["name"]
-        self.update_status(self.lang["login_loading"].format(profile=profile_name))
-        self._start_login(profile, fetch_identity=False)
-
-    def action_cancel_login(self):
-        """Cancel an in-progress SSO login or authentication."""
-        if not self.auth_worker_active or not self.auth_cancel_event:
-            self.update_status(self.lang["no_login_task"], error=True)
-            return
-
-        if not self.auth_cancel_event.is_set():
-            self.auth_cancel_event.set()
-            if self.authenticating_profile:
-                profile_name = self.authenticating_profile.get("name", "")
-                event_name = (
-                    "authentication_cancel_requested"
-                    if self.authenticating_fetch_identity
-                    else "sso_login_cancel_requested"
-                )
-                if profile_name:
-                    self.logger.info(event_name, profile=profile_name)
-                else:
-                    self.logger.info(event_name)
-        self.update_status(self.lang["login_cancelling"])
-
-    def action_whoami(self):
-        """Trigger whoami identity check."""
-        if not self.selected_profile:
-            self.update_status(self.lang["select_profile_first"], error=True)
-            return
-
-        self.update_status(self.lang["whoami_checking"])
-        # Make a copy to avoid thread safety issues
-        profile_snapshot = self.selected_profile.copy()
-        self.perform_whoami(profile_snapshot)
-
-    @work(exclusive=False, thread=True)
-    def perform_whoami(self, profile: Profile):
-        """Execute whoami in worker thread."""
-        from .aws_cli import get_caller_identity
-
-        profile_name = profile["name"]
-        identity = get_caller_identity(profile_name)
-
-        # Update UI from thread
-        self.call_from_thread(self._update_whoami_result, profile, identity)
-
-    def _update_whoami_result(self, profile: Profile, identity: dict | None):
-        """Update UI with whoami result (called from worker thread)."""
-        if identity:
-            # Only update if this profile is still selected
-            if (
-                self.selected_profile
-                and self.selected_profile["name"] == profile["name"]
-            ):
-                detail_content = self.query_one("#detail-content", Static)
-                detail_content.remove_class("empty-state")
-                detail_content.update(self.build_identity_detail(identity))
-
-                # Ensure profile list stays populated after UI update
-                try:
-                    profile_list = self.query_one("#profile-list", ProfileList)
-                    # Check if list was accidentally cleared but has data
-                    if (
-                        profile_list.filtered_profiles
-                        and len(list(profile_list.children)) == 0
-                    ):
-                        self.logger.warning(
-                            "profile_list_empty_after_whoami",
-                            filtered_count=len(profile_list.filtered_profiles),
-                        )
-                        profile_list.refresh_items()
-                except Exception as e:
-                    self.logger.error("profile_list_check_failed", error=str(e))
-
-            self.update_status(self.lang["whoami_updated"])
-        else:
-            self.update_status(self.lang["whoami_failed"], error=True)
-
-    def action_region_override(self):
-        """Show region override dialog."""
-
-        def handle_region_result(result: str | None) -> None:
-            """Handle the result from region input screen."""
-            if result is not None:
-                # User entered empty string - clear override
-                if result == "":
-                    self.override_region = None
-                    self.update_status(self.lang["region_override_cleared"])
-                else:
-                    # Set new override
-                    self.override_region = result
-                    self.update_status(
-                        self.lang["region_override_set"].format(region=result)
-                    )
-
-                # Update detail pane if a profile is selected
-                if self.selected_profile:
-                    detail_content = self.query_one("#detail-content", Static)
-                    detail_content.update(
-                        self.build_profile_detail(self.selected_profile)
-                    )
-
-        self.push_screen(RegionInputScreen(), handle_region_result)
-
-    def action_clear_cli(self):
-        """Clear output area."""
-        output_area = self.query_one("#output-area", RichLog)
-        output_area.clear()
-        self.notify(self.lang["output_cleared"])
-
-    def navigate_history_up(self, input_widget: Input) -> None:
-        """Navigate up in command history (older commands)."""
-        if not self.command_history:
-            return
-
-        # First time pressing up: save current input
-        if self.history_index == -1:
-            self.current_input = input_widget.value
-            self.history_index = len(self.command_history)
-
-        # Move up
-        if self.history_index > 0:
-            self.history_index -= 1
-            input_widget.value = self.command_history[self.history_index]
-            input_widget.action_end()
-
-            # Enter history browsing mode
-            self.browsing_history = True
-
-            # Close autocomplete
-            autocomplete = self.query_one("#autocomplete", CommandAutocomplete)
-            autocomplete.display = False
-            autocomplete.clear_options()
-
-    def navigate_history_down(self, input_widget: Input) -> None:
-        """Navigate down in command history (newer commands)."""
-        if self.history_index == -1:
-            return  # Not in browsing mode
-
-        # Move down
-        self.history_index += 1
-
-        if self.history_index >= len(self.command_history):
-            # Return to original input
-            input_widget.value = self.current_input
-            self.history_index = -1
-            self.browsing_history = False  # Exit history mode
-        else:
-            input_widget.value = self.command_history[self.history_index]
-            input_widget.action_end()
-            self.browsing_history = True  # Still in history mode
-
-        # Close autocomplete
-        autocomplete = self.query_one("#autocomplete", CommandAutocomplete)
-        autocomplete.display = False
-        autocomplete.clear_options()
-
-    @work(exclusive=True, thread=True)
-    def execute_aws_command(self, command: str):
-        """Execute AWS CLI command and display output in real-time."""
-        # Add to command history (avoid duplicates)
-        if command and (
-            not self.command_history or self.command_history[-1] != command
-        ):
-            self.command_history.append(command)
-
-        # Reset history browsing state
-        self.history_index = -1
-        self.current_input = ""
-        self.browsing_history = False
-
-        output_area = self.query_one("#output-area", RichLog)
-
-        # Show current profile and command
-        profile_name = (
-            self.selected_profile["name"]
-            if self.selected_profile
-            else self.lang["profile_none"]
-        )
-        self.call_from_thread(
-            output_area.write, f"[bold cyan][{profile_name}] $ {command}[/bold cyan]"
-        )
-
-        # Setup environment with selected profile
-        env = os.environ.copy()
-        if self.selected_profile:
-            env["AWS_PROFILE"] = self.selected_profile["name"]
-            # Use override_region if set, otherwise use profile's region
-            region = self.override_region or self.selected_profile.get("region")
-            if region:
-                env["AWS_DEFAULT_REGION"] = region
-
-        # Execute command with real-time output streaming
-        start_time = time()
+        self.statuses[item.name] = ContextStatus.VERIFYING
+        self.errors.pop(item.name, None)
+        self._refresh_context_list()
+        self._render_selected_context()
+        exit_code: int | None = None
+        runtime: VerifiedRuntime | None = None
         try:
-            process = subprocess.Popen(
-                command,
-                shell=True,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,  # Line buffered
-            )
-
-            # Stream stdout in real-time
-            if process.stdout:
-                for line in iter(process.stdout.readline, ""):
-                    if line:
-                        self.call_from_thread(output_area.write, line.rstrip())
-
-            # Wait for process to complete
-            process.wait()
-
-            # Get any remaining stderr
-            if process.stderr:
-                stderr_output = process.stderr.read()
-                if stderr_output:
-                    self.call_from_thread(
-                        output_area.write, f"[red]{stderr_output.rstrip()}[/red]"
+            with self.suspend():
+                status = self._text("authenticating")
+                CliConsole(sys.stderr).print(
+                    render_status_rich(status),
+                    plain=status,
+                    flush=True,
+                )
+                runtime = prepare_context_runtime(
+                    item.name,
+                    base_environment=self.base_environment,
+                    start_dir=self.start_dir,
+                    bindings_path=self.bindings_path,
+                    login_output=sys.stderr,
+                )
+                if command is not None:
+                    argv = (
+                        (select_interactive_shell(runtime.environment),)
+                        if not command
+                        else command
                     )
-
-            duration_ms = int((time() - start_time) * 1000)
-
-            # Display execution info
-            if process.returncode == 0:
-                self.call_from_thread(
-                    output_area.write,
-                    f"[dim]{self.lang['execute_success'].format(duration=duration_ms)}[/dim]\n",
+                    command_text = shlex.join(argv)
+                    CliConsole(sys.stderr).print(
+                        render_launch_context_rich(runtime.verified, command_text),
+                        plain=render_launch_context(
+                            runtime.verified,
+                            f"Launching: {command_text}",
+                        ),
+                        flush=True,
+                    )
+                    exit_code = run_command(argv, environment=runtime.environment)
+        except AccountMismatchError as exc:
+            self.statuses[item.name] = ContextStatus.MISMATCH
+            self.actual_accounts[item.name] = exc.actual_account
+            self.errors[item.name] = str(exc)
+            self.notify(self._text("notification_mismatch"), severity="error")
+        except (ContextResolutionError, ContextVerificationError) as exc:
+            self.statuses[item.name] = ContextStatus.ERROR
+            self.errors[item.name] = str(exc)
+            self.notify(
+                str(exc),
+                severity="error",
+                title=self._text("notification_verification_failed"),
+            )
+        except CommandLaunchError as exc:
+            if runtime is not None:
+                self._record_verified(item.name, runtime.verified)
+            self.notify(
+                str(exc),
+                severity="error",
+                title=self._text("notification_launch_failed"),
+            )
+        except KeyboardInterrupt:
+            self.statuses[item.name] = item.status
+            self.notify(self._text("notification_cancelled"), severity="warning")
+        else:
+            if runtime is not None:
+                self._record_verified(item.name, runtime.verified)
+            if exit_code is None:
+                self.notify(self._text("notification_verified"), severity="information")
+            elif exit_code == 0:
+                self.notify(
+                    self._text("notification_child_completed"),
+                    severity="information",
                 )
             else:
-                self.call_from_thread(
-                    output_area.write,
-                    f"[red]{self.lang['cli_error_exit'].format(code=process.returncode, duration=duration_ms)}[/red]\n",
+                self.notify(
+                    self._text("notification_child_exit", code=exit_code),
+                    severity="warning",
                 )
+        finally:
+            self._refresh_context_list()
+            self._render_selected_context()
 
-            self.logger.info(
-                "cli_command_executed",
-                command=command,
-                profile=profile_name,
-                duration_ms=duration_ms,
-                exit_code=process.returncode,
-            )
-
-        except Exception as e:
-            self.call_from_thread(
-                output_area.write,
-                f"[red]{self.lang['cli_error_exception'].format(error=str(e))}[/red]\n",
-            )
-            self.logger.error("cli_command_error", command=command, error=str(e))
-
-    @work(exclusive=False, thread=True)
-    def execute_q_query(self, query: str):
-        """Execute Amazon Q CLI query and display response."""
-        output_area = self.query_one("#output-area", RichLog)
-
-        # Show query
-        self.call_from_thread(output_area.write, f"[bold cyan]Q: {query}[/bold cyan]")
-
-        # Start animated status indicator
-        self.call_from_thread(self._start_ai_spinner, self.lang["ai_spinner_wait"])
-
-        # Prepare context
-        context = ""
-        if self.selected_profile:
-            # Use override_region if set, otherwise use profile's region
-            region = self.override_region or self.selected_profile.get("region")
-            context = format_aws_context(
-                profile_name=self.selected_profile.get("name"),
-                region=region,
-                account=self.selected_profile.get("account"),
-            )
-
-        # Show querying status
-        self.call_from_thread(self.update_status, self.lang["ai_querying"])
-
-        # Execute query with AWS profile environment (streaming)
-        start_time = time()
-        try:
-            # Use override_region if set, otherwise use profile's region
-            region = self.override_region or (
-                self.selected_profile.get("region") if self.selected_profile else None
-            )
-
-            # Start streaming process
-            process = stream_q_cli_query(
-                prompt=query,
-                context=context,
-                profile_name=self.selected_profile.get("name")
-                if self.selected_profile
-                else None,
-                region=region,
-            )
-
-            if not process:
-                duration_ms = int((time() - start_time) * 1000)
-                self.call_from_thread(
-                    self._stop_ai_spinner, self.lang["ai_spinner_error"], False
-                )
-                self.call_from_thread(
-                    output_area.write,
-                    "[red]Amazon Q Developer CLI not available or failed to start.[/red]\n",
-                )
-                self.call_from_thread(
-                    self.update_status, self.lang["ai_query_failed"], error=True
-                )
-                self.logger.error(
-                    "q_query_failed", query=query, duration_ms=duration_ms
-                )
-                return
-
-            # Stream output line by line
-            output_lines = []
-            success = True
-
-            try:
-                for line in process.stdout:
-                    if line:
-                        clean_line = clean_ansi_codes(line.rstrip("\n"))
-                        output_lines.append(clean_line)
-                        # Display line immediately
-                        self.call_from_thread(
-                            output_area.write, f"[green]{clean_line}[/green]\n"
-                        )
-
-                # Wait for process to complete
-                process.wait()
-
-                # Check return code
-                if process.returncode != 0:
-                    success = False
-                    stderr_output = process.stderr.read() if process.stderr else ""
-                    if stderr_output:
-                        clean_error = clean_ansi_codes(stderr_output.strip())
-                        self.call_from_thread(
-                            output_area.write, f"[red]Error: {clean_error}[/red]\n"
-                        )
-
-            except Exception as stream_exc:
-                success = False
-                self.call_from_thread(
-                    output_area.write,
-                    f"[red]Stream error: {str(stream_exc)}[/red]\n",
-                )
-
-        except Exception as exc:  # pragma: no cover - defensive
-            duration_ms = int((time() - start_time) * 1000)
-            error_text = str(exc) or "Unknown error"
-            self.call_from_thread(
-                self._stop_ai_spinner, self.lang["ai_spinner_error"], False
-            )
-            self.call_from_thread(
-                output_area.write,
-                f"[red]{self.lang['ai_error_exception'].format(error=error_text, duration=duration_ms)}[/red]\n",
-            )
-            self.call_from_thread(
-                self.update_status, self.lang["ai_query_failed"], error=True
-            )
-            self.logger.exception(
-                "q_query_exception", query=query, duration_ms=duration_ms
-            )
-            return
-
-        duration_ms = int((time() - start_time) * 1000)
-
-        # Update UI after completion
-        if success:
-            self.call_from_thread(
-                self._stop_ai_spinner, self.lang["ai_spinner_done"], True
-            )
-            self.call_from_thread(
-                output_area.write,
-                f"[dim]{self.lang['execute_success'].format(duration=duration_ms)}[/dim]\n",
-            )
-            self.logger.info("q_query_success", query=query, duration_ms=duration_ms)
-        else:
-            self.call_from_thread(
-                self._stop_ai_spinner, self.lang["ai_spinner_error"], False
-            )
-            self.call_from_thread(
-                output_area.write,
-                f"[dim]{self.lang['execute_failure'].format(duration=duration_ms)}[/dim]\n",
-            )
-            self.call_from_thread(
-                self.update_status, self.lang["ai_query_failed"], error=True
-            )
-            response_text = "\n".join(output_lines) if output_lines else "Unknown error"
-            self.logger.error(
-                "q_query_failed",
-                query=query,
-                duration_ms=duration_ms,
-                error=response_text,
-            )
-
-    def action_show_cheatsheet(self):
-        """Show AWS CLI cheatsheet in modal screen."""
-        self.push_screen(CheatsheetScreen())
-
-    def action_show_help(self):
-        """Show help overlay."""
-        detail_content = self.query_one("#detail-content", Static)
-        detail_content.remove_class("empty-state")
-        detail_content.update(self.lang["help_text"])
-        self.notify(self.lang["help_displayed"])
+    def _record_verified(self, environment: str, verified: VerifiedContext) -> None:
+        self.statuses[environment] = ContextStatus.VERIFIED
+        self.verified[environment] = verified
+        self.verified_at[environment] = datetime.now().astimezone()
+        self.actual_accounts.pop(environment, None)
+        self.errors.pop(environment, None)
 
 
-def main():
-    """Entry point for awsui CLI."""
-    args = parse_args()
+def run_tui(
+    *,
+    lang: str = "en",
+    log_level: str = "INFO",
+) -> None:
+    """Create and run the project Context Dashboard."""
+    AWSUIApp(lang=lang, log_level=log_level).run()
 
-    # Create and run app
-    app = AWSUIApp(
-        lang=args.lang,
-        profile=args.profile,
-        region=args.region,
-        log_level=args.log_level,
-    )
-    app.run()
+
+def main() -> int:
+    """Preserve the historical ``python -m awsui.app`` entry point."""
+    from .cli import main as cli_main
+
+    return cli_main()
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -1,245 +1,317 @@
-"""Internationalization (i18n) - UI translations for awsui."""
-
-LANG_ZH_TW = {
-    "search_placeholder": "搜尋 profiles (按 / 聚焦)...",
-    "cli_placeholder": "輸入 AWS CLI 指令（開始輸入顯示建議，空白時 ↑↓ 瀏覽歷史）",
-    "no_profiles": "未偵測到 profiles",
-    "no_profiles_hint": "請執行 'aws configure sso-session' 或 'aws configure sso' 建立",
-    "no_aws_cli": "未偵測到 AWS CLI v2",
-    "no_aws_cli_hint": "請依官方文件安裝 AWS CLI v2",
-    "detail_name": "名稱",
-    "detail_kind": "類型",
-    "detail_account": "帳號",
-    "detail_role": "角色",
-    "detail_region": "區域",
-    "detail_session": "SSO Session",
-    "panel_profiles": "Profiles",
-    "panel_profiles_help": "搜尋與切換",
-    "panel_detail": "Profile 詳情",
-    "detail_placeholder": "選擇 profile 以顯示資料",
-    "panel_cli": "CLI 終端",
-    "panel_cli_help": "輸出與歷史",
-    "panel_cli_input": "指令輸入",
-    "app_subtitle": "Profile 切換與 CLI 助手",
-    "authenticating": "驗證中...",
-    "login_required": "需要登入",
-    "login_success": "登入成功",
-    "login_failed": "登入失敗",
-    "login_cancelling": "取消登入中...",
-    "login_cancelled": "登入已取消",
-    "login_in_progress": "登入處理中，請稍候",
-    "auth_success": "驗證成功",
-    "auth_failed": "驗證失敗",
-    "auth_cancelled": "驗證已取消",
-    "whoami": "當前身份",
-    "whoami_updated": "身份資訊已更新",
-    "whoami_failed": "無法取得身份資訊",
-    "whoami_account": "帳號",
-    "whoami_arn": "ARN",
-    "whoami_user": "使用者 ID",
-    "no_login_task": "目前沒有登入作業",
-    "select_profile_first": "請先選擇 profile",
-    "panel_ai": "AI 助手",
-    "panel_ai_help": "Amazon Q 開發助手",
-    "ai_placeholder": "詢問 Amazon Q (例: 如何列出所有 S3 buckets?)",
-    "ai_not_available": "Amazon Q CLI 不可用",
-    "ai_install_hint": "請先安裝 Amazon Q Developer CLI",
-    "ai_spinner_wait": "正在查詢 Amazon Q",
-    "ai_spinner_done": "查詢完成",
-    "ai_spinner_error": "查詢失敗",
-    "ai_querying": "查詢中...",
-    "ai_query_failed": "查詢失敗",
-    "ai_cancelled": "已取消查詢",
-    "whoami_checking": "正在取得身份資訊...",
-    "search_first_result": "已選擇第一個結果，共 {count} 個符合",
-    "search_no_results": "沒有符合的 profiles",
-    "left_pane_shown": "左側面板已顯示",
-    "cli_fullscreen": "CLI 滿版模式 - 按 t 恢復",
-    "cli_mode": "CLI 模式",
-    "ai_mode": "AI 模式",
-    "output_cleared": "輸出已清空",
-    "help_displayed": "說明已顯示",
-    "region_override_wip": "Region override - 功能開發中",
-    "region_input_title": "覆寫區域",
-    "region_input_placeholder": "輸入 AWS 區域（例: us-west-2）",
-    "region_input_hint": "留空使用 profile 預設值",
-    "region_override_set": "區域已覆寫為：{region}",
-    "region_override_cleared": "區域覆寫已清除",
-    "detail_region_override": "區域（已覆寫）",
-    "login_loading": "登入 {profile}...",
-    "profiles_loaded": "載入 {count} 個 profiles",
-    "execute_success": "✓ 完成 ({duration}ms)",
-    "execute_failure": "✗ 失敗 ({duration}ms)",
-    "cli_error_exit": "✗ 錯誤 (exit code: {code}, {duration}ms)",
-    "ai_error_exception": "✗ 發生錯誤: {error} ({duration}ms)",
-    "cli_error_exception": "✗ 執行錯誤: {error}",
-    "profile_none": "未選擇",
-    "error_title": "錯誤",
-    "cheatsheet_title": "AWS CLI Cheatsheet",
-    "cheatsheet_dismiss": "按 Esc 或 q 關閉",
-    "help_text": """[bold]快捷鍵說明:[/bold]
-
-/ - 聚焦搜尋框
-c - 切換到 CLI 模式
-a - 切換到 AI 助手模式
-t - 切換左側面板顯示/隱藏
-h - 顯示 AWS CLI Cheatsheet
-Enter - 套用選定的 profile
-l - 強制執行 SSO login
-w - 顯示當前身份 (WhoAmI)
-Ctrl+L - 清空輸出區域
-Ctrl+U - 清空輸入框
-Esc - 離開輸入框
-? - 顯示此說明
-q - 離開程式
-
-[bold]CLI 輸入框智慧導航:[/bold]
-
-空白時：
-  ↑↓ - 瀏覽歷史指令
-
-瀏覽歷史時：
-  ↑↓ - 繼續瀏覽（不會觸發 autocomplete）
-  修改內容 - 自動離開歷史模式
-
-輸入內容後有建議時：
-  ↑↓ - 在 autocomplete 建議中選擇
-  Enter - 確認選擇
-
-輸入內容但沒建議時：
-  ↑↓ - 瀏覽歷史指令
-
-[bold]使用方式:[/bold]
-
-1. 使用搜尋框過濾 profiles
-2. 上下鍵選擇 profile
-3. 按 c 進入 CLI 模式，或按 a 進入 AI 助手模式
-4. CLI 模式：空白時按 ↑↓ 快速找歷史指令
-5. CLI 模式：開始輸入，自動顯示建議（↑↓ 選擇）
-6. AI 模式：直接輸入自然語言問題
-7. Ctrl+U 快速清空輸入
-8. 按 h 查看常用 AWS CLI 指令
-9. 按 t 可隱藏左側面板，讓輸出區域滿版顯示""",
-}
+"""Translations used by the project Context Dashboard."""
 
 LANG_EN = {
-    "search_placeholder": "Search profiles (press / to focus)...",
-    "cli_placeholder": "AWS CLI command (type to see suggestions, use ↑↓ for history)",
-    "no_profiles": "No profiles detected",
-    "no_profiles_hint": "Please run 'aws configure sso-session' or 'aws configure sso'",
-    "no_aws_cli": "AWS CLI v2 not detected",
-    "no_aws_cli_hint": "Please install AWS CLI v2 per official documentation",
-    "detail_name": "Name",
-    "detail_kind": "Type",
-    "detail_account": "Account",
-    "detail_role": "Role",
-    "detail_region": "Region",
-    "detail_session": "SSO Session",
-    "panel_profiles": "Profiles",
-    "panel_profiles_help": "Search & switch",
-    "panel_detail": "Profile Details",
-    "detail_placeholder": "Select a profile to view details",
-    "panel_cli": "Command Console",
-    "panel_cli_help": "Output & history",
-    "panel_cli_input": "Command Input",
-    "app_subtitle": "Profile switcher & CLI helper",
-    "authenticating": "Authenticating...",
-    "login_required": "Login required",
-    "login_success": "Login successful",
-    "login_failed": "Login failed",
-    "login_cancelling": "Cancelling login...",
-    "login_cancelled": "Login cancelled",
-    "login_in_progress": "Login already in progress",
-    "auth_success": "Authentication successful",
-    "auth_failed": "Authentication failed",
-    "auth_cancelled": "Authentication cancelled",
-    "whoami": "Current Identity",
-    "whoami_updated": "Identity refreshed",
-    "whoami_failed": "Unable to fetch identity",
-    "whoami_account": "Account",
-    "whoami_arn": "ARN",
-    "whoami_user": "UserId",
-    "no_login_task": "No login is currently running",
-    "select_profile_first": "Select a profile first",
-    "panel_ai": "AI Assistant",
-    "panel_ai_help": "Amazon Q Developer",
-    "ai_placeholder": "Ask Amazon Q (e.g., How to list all S3 buckets?)",
-    "ai_not_available": "Amazon Q CLI not available",
-    "ai_install_hint": "Please install Amazon Q Developer CLI first",
-    "ai_spinner_wait": "Querying Amazon Q",
-    "ai_spinner_done": "Query complete",
-    "ai_spinner_error": "Query failed",
-    "ai_querying": "Querying...",
-    "ai_query_failed": "Query failed",
-    "ai_cancelled": "Query cancelled",
-    "whoami_checking": "Fetching identity...",
-    "search_first_result": "Selected first result; {count} matches",
-    "search_no_results": "No matching profiles",
-    "left_pane_shown": "Left pane shown",
-    "cli_fullscreen": "CLI fullscreen mode – press t to restore",
-    "cli_mode": "Switched to CLI mode",
-    "ai_mode": "Switched to AI mode",
-    "output_cleared": "Output cleared",
-    "help_displayed": "Help displayed",
-    "region_override_wip": "Region override – coming soon",
-    "region_input_title": "Override Region",
-    "region_input_placeholder": "Enter AWS region (e.g., us-west-2)",
-    "region_input_hint": "Leave empty to use profile default",
-    "region_override_set": "Region override set to: {region}",
-    "region_override_cleared": "Region override cleared",
-    "detail_region_override": "Region (Override)",
-    "login_loading": "Logging in to {profile}...",
-    "profiles_loaded": "Loaded {count} profiles",
-    "execute_success": "✓ Completed ({duration}ms)",
-    "execute_failure": "✗ Failed ({duration}ms)",
-    "cli_error_exit": "✗ Error (exit code: {code}, {duration}ms)",
-    "ai_error_exception": "✗ Error: {error} ({duration}ms)",
-    "cli_error_exception": "✗ Execution error: {error}",
-    "profile_none": "No profile",
-    "error_title": "Error",
-    "cheatsheet_title": "AWS CLI Cheatsheet",
-    "cheatsheet_dismiss": "Press Esc or q to close",
-    "help_text": """[bold]Keyboard Shortcuts:[/bold]
+    "action_initialize": "Initialize",
+    "action_doctor": "Doctor",
+    "action_bind": "Bind",
+    "action_verify": "Verify",
+    "action_launch": "Launch",
+    "action_shell": "Shell",
+    "action_reload": "Reload",
+    "action_help": "Help",
+    "action_quit": "Quit",
+    "action_close": "Close",
+    "action_cancel": "Cancel",
+    "action_verify_launch": "Verify & Launch",
+    "action_continue": "Continue",
+    "action_back": "Back",
+    "action_refresh_profiles": "Refresh",
+    "action_create_profile": "Create profile",
+    "action_verify_add": "Verify & Add",
+    "action_open_aws_cli": "Continue in AWS CLI",
+    "action_confirm_access_key": "I understand · Continue",
+    "action_cancel_verification": "Cancel verification",
+    "action_remove": "Remove",
+    "action_edit": "Edit",
+    "action_add_environment": "Add environment",
+    "action_create_project": "Create project",
+    "status_unbound": "UNBOUND",
+    "status_profile_missing": "PROFILE MISSING",
+    "status_ready": "READY TO VERIFY",
+    "status_verifying": "VERIFYING",
+    "status_verified": "VERIFIED",
+    "status_mismatch": "MISMATCH",
+    "status_error": "ERROR",
+    "protected": "PROTECTED",
+    "field_environment": "Environment",
+    "field_expected_account": "Expected account",
+    "field_region": "Region",
+    "field_local_profile": "Local profile",
+    "field_actual_account": "Actual account",
+    "field_role": "Role",
+    "field_user": "User",
+    "field_principal": "Principal",
+    "field_last_verified": "Last verified",
+    "topbar_product": "VERIFIED AWS CONTEXT",
+    "environment_heading": "ENVIRONMENTS",
+    "doctor_title": "Doctor",
+    "help_title": "Keyboard shortcuts",
+    "init_title": "Initialize project",
+    "init_project_title": "Project",
+    "init_project_help": (
+        "The project name is shared with the team. Local profile names remain "
+        "on this machine."
+    ),
+    "init_project_label": "Project name",
+    "init_context_title": "Environment",
+    "init_context_help": (
+        "Bind one logical environment to a local profile, then verify its real "
+        "AWS identity."
+    ),
+    "init_environment_label": "Environment name",
+    "init_environment_placeholder": "dev, qa, staging, prod, or another name",
+    "init_profile_label": "Local AWS profile",
+    "init_protected_label": "Protected environment",
+    "init_create_profile_title": "Create local AWS profile",
+    "init_create_profile_help": (
+        "Choose a method here. awsui temporarily hands the terminal to the "
+        "official AWS CLI for credential setup."
+    ),
+    "init_profile_name_label": "Profile name",
+    "init_access_key_warning": (
+        "Long-term access keys are not recommended. AWS CLI will write them to "
+        "your shared credentials file."
+    ),
+    "init_verify_title": "Verify AWS identity",
+    "init_verify_status": "Authenticating {profile} and calling STS…",
+    "init_cancelling_verification": "Cancelling authentication safely…",
+    "init_review_title": "Review project contexts",
+    "init_review_help": (
+        "Every account below was verified with STS. Shared configuration is "
+        "written only when you create the project."
+    ),
+    "init_progress_project": "01  PROJECT   ·   02  ENVIRONMENT   ·   03  VERIFY   ·   04  REVIEW",
+    "init_progress_context": "01  PROJECT   ·   02  ENVIRONMENT   ·   03  VERIFY   ·   04  REVIEW",
+    "init_progress_profile": "01  PROJECT   ·   02  PROFILE SETUP   ·   RETURN TO ENVIRONMENT",
+    "init_progress_verify": "01  PROJECT   ·   02  ENVIRONMENT   ·   03  VERIFYING   ·   04  REVIEW",
+    "init_progress_review": "01  PROJECT   ·   02  ENVIRONMENT   ·   03  VERIFIED   ·   04  REVIEW",
+    "init_no_profiles": "No local AWS profiles found",
+    "init_method_sso": "IAM Identity Center (SSO)  ·  Recommended",
+    "init_method_console": "AWS Console Login  ·  Temporary browser credentials",
+    "init_method_console_unavailable": "AWS Console Login  ·  Requires AWS CLI ≥ 2.32",
+    "init_method_access_key": "Access key  ·  Not recommended",
+    "init_environment_default_suffix": "dev",
+    "init_error_project_required": "Project name is required.",
+    "init_error_environment_required": "Environment name is required.",
+    "init_error_environment_duplicate": "Environment {environment!r} was already added.",
+    "init_error_profile_required": "Select or create a local AWS profile.",
+    "init_error_region_required": "AWS region is required.",
+    "init_error_profile_name_required": "Profile name is required.",
+    "init_error_profile_exists": "Profile {profile!r} already exists; select it instead.",
+    "init_error_one_environment_required": "A project must contain at least one environment.",
+    "init_confirm_access_key": "Press the confirmation action again to continue.",
+    "init_confirm_discard": "Press Cancel again to discard the verified draft.",
+    "unknown_error": "Unknown error",
+    "guidance_unbound": "Run Bind to select a local profile for {environment}.",
+    "guidance_profile_missing": (
+        "The bound profile was not found locally. Run Bind to replace it."
+    ),
+    "guidance_ready": (
+        "Press Verify before trusting this context; launches always reverify."
+    ),
+    "guidance_verifying": "Authenticating and comparing the STS account identity…",
+    "guidance_verified": "Account matches {project}/{environment}.",
+    "guidance_mismatch": (
+        "Execution is blocked. Rebind the environment to the intended profile."
+    ),
+    "guidance_error": "Run Doctor or retry verification after fixing the issue.",
+    "subtitle_no_project": "No project",
+    "subtitle_configuration_error": "Configuration error",
+    "onboarding_title": "awsui · onboarding",
+    "onboarding_missing": "No .awsui.yaml found",
+    "onboarding_body": (
+        "Initialize this directory as an awsui project, or run awsui from an "
+        "existing project."
+    ),
+    "onboarding_next": "Press i or choose Initialize.",
+    "load_error_heading": "Unable to load project context",
+    "load_error_unknown": "Unknown configuration error",
+    "load_error_next": "Run Doctor and fix the reported file before reloading.",
+    "load_error_title": "✗ Context unavailable",
+    "launch_title": "Launch in {environment}",
+    "launch_warning": "PROTECTED context — verify the target before launching.",
+    "launch_custom": "Custom command",
+    "launch_placeholder": "codex --help",
+    "authenticating": "Authenticating and verifying AWS identity...",
+    "notification_reloaded": "Dashboard reloaded",
+    "notification_init_cancelled": "Initialization cancelled",
+    "notification_init_failed": "Initialization failed",
+    "notification_initialized": "Project initialized",
+    "notification_profiles_reloaded": "AWS profiles reloaded",
+    "notification_profile_creation_cancelled": "Profile creation cancelled",
+    "notification_profile_created": "Created AWS profile {profile}",
+    "notification_verification_cancelled": "Verification cancelled",
+    "notification_environment_verified": "Verified {environment}",
+    "notification_environment_removed": "Removed {environment}",
+    "notification_bind_cancelled": "Binding cancelled",
+    "notification_bind_failed": "Binding failed",
+    "notification_bound": "Binding updated for {environment}",
+    "notification_invalid_command": "Invalid command",
+    "notification_mismatch": "Account mismatch — execution blocked",
+    "notification_verification_failed": "Verification failed",
+    "notification_launch_failed": "Launch failed",
+    "notification_cancelled": "Operation cancelled",
+    "notification_verified": "AWS identity verified",
+    "notification_child_completed": "Child process completed",
+    "notification_child_exit": "Child process exited with code {code}",
+    "help_text": (
+        "[bold cyan]Context Dashboard[/]\n\n"
+        "[bold]↑/↓[/] Select environment\n"
+        "[bold]Enter / v[/] Verify identity\n"
+        "[bold]b[/] Bind local profile\n"
+        "[bold]l[/] Launch detected or custom tool\n"
+        "[bold]s[/] Open verified shell\n"
+        "[bold]d[/] Run local diagnostics\n"
+        "[bold]r[/] Reload project state\n"
+        "[bold]?[/] Help    [bold]q[/] Quit"
+    ),
+}
 
-/ - Focus search box
-c - Switch to CLI mode
-a - Switch to AI assistant mode
-t - Toggle left pane visibility
-h - Show AWS CLI Cheatsheet
-Enter - Apply selected profile
-l - Force SSO login
-w - Show current identity (WhoAmI)
-Ctrl+L - Clear output area
-Ctrl+U - Clear input field
-Esc - Exit input field
-? - Show this help
-q - Quit
-
-[bold]CLI Input Smart Navigation:[/bold]
-
-When empty:
-  ↑↓ - Browse command history
-
-While browsing history:
-  ↑↓ - Continue browsing (won't trigger autocomplete)
-  Type - Exit history mode
-
-When input has content with suggestions:
-  ↑↓ - Select from autocomplete suggestions
-  Enter - Confirm selection
-
-When input has content without suggestions:
-  ↑↓ - Browse command history
-
-[bold]Quick Start:[/bold]
-
-1. Use search box to filter profiles
-2. Use ↑↓ keys to select profile
-3. Press c for CLI mode, or press a for AI mode
-4. CLI mode: Press ↑↓ when empty to browse history
-5. CLI mode: Start typing to see suggestions (↑↓ to select)
-6. AI mode: Enter natural language questions
-7. Press Ctrl+U to quickly clear input
-8. Press h to view common AWS CLI commands
-9. Press t to hide left pane for fullscreen output""",
+LANG_ZH_TW = {
+    "action_initialize": "初始化",
+    "action_doctor": "診斷",
+    "action_bind": "綁定",
+    "action_verify": "驗證",
+    "action_launch": "啟動工具",
+    "action_shell": "Shell",
+    "action_reload": "重載",
+    "action_help": "說明",
+    "action_quit": "離開",
+    "action_close": "關閉",
+    "action_cancel": "取消",
+    "action_verify_launch": "驗證並啟動",
+    "action_continue": "繼續",
+    "action_back": "返回",
+    "action_refresh_profiles": "重新整理",
+    "action_create_profile": "建立 Profile",
+    "action_verify_add": "驗證並加入",
+    "action_open_aws_cli": "前往 AWS CLI",
+    "action_confirm_access_key": "我了解風險 · 繼續",
+    "action_cancel_verification": "取消驗證",
+    "action_remove": "移除",
+    "action_edit": "編輯",
+    "action_add_environment": "新增環境",
+    "action_create_project": "建立專案",
+    "status_unbound": "尚未綁定",
+    "status_profile_missing": "找不到 PROFILE",
+    "status_ready": "等待驗證",
+    "status_verifying": "驗證中",
+    "status_verified": "已驗證",
+    "status_mismatch": "帳號不符",
+    "status_error": "錯誤",
+    "protected": "受保護環境",
+    "field_environment": "環境",
+    "field_expected_account": "預期帳號",
+    "field_region": "區域",
+    "field_local_profile": "本機 Profile",
+    "field_actual_account": "已驗證帳號",
+    "field_role": "角色",
+    "field_user": "使用者",
+    "field_principal": "身分",
+    "field_last_verified": "最後驗證時間",
+    "topbar_product": "已驗證 AWS CONTEXT",
+    "environment_heading": "環境",
+    "doctor_title": "診斷",
+    "help_title": "鍵盤快捷鍵",
+    "init_title": "初始化專案",
+    "init_project_title": "專案",
+    "init_project_help": "專案名稱會與團隊共享，本機 Profile 名稱只保留在這台電腦。",
+    "init_project_label": "專案名稱",
+    "init_context_title": "環境",
+    "init_context_help": "將邏輯環境綁定到本機 Profile，再驗證其真實 AWS 身分。",
+    "init_environment_label": "環境名稱",
+    "init_environment_placeholder": "dev、qa、staging、prod 或其他名稱",
+    "init_profile_label": "本機 AWS Profile",
+    "init_protected_label": "受保護環境",
+    "init_create_profile_title": "建立本機 AWS Profile",
+    "init_create_profile_help": (
+        "先在此選擇方式；設定憑證時 awsui 會暫時把終端交給官方 AWS CLI。"
+    ),
+    "init_profile_name_label": "Profile 名稱",
+    "init_access_key_warning": (
+        "不建議使用長期 Access key。AWS CLI 會將它寫入共用 credentials 檔案。"
+    ),
+    "init_verify_title": "驗證 AWS 身分",
+    "init_verify_status": "正在驗證 {profile} 並呼叫 STS…",
+    "init_cancelling_verification": "正在安全取消驗證…",
+    "init_review_title": "確認專案 Context",
+    "init_review_help": (
+        "以下帳號都已透過 STS 驗證；只有建立專案時才會寫入共用設定。"
+    ),
+    "init_progress_project": "01  專案   ·   02  環境   ·   03  驗證   ·   04  確認",
+    "init_progress_context": "01  專案   ·   02  環境   ·   03  驗證   ·   04  確認",
+    "init_progress_profile": "01  專案   ·   02  PROFILE 設定   ·   返回環境",
+    "init_progress_verify": "01  專案   ·   02  環境   ·   03  驗證中   ·   04  確認",
+    "init_progress_review": "01  專案   ·   02  環境   ·   03  已驗證   ·   04  確認",
+    "init_no_profiles": "找不到本機 AWS Profile",
+    "init_method_sso": "IAM Identity Center (SSO)  ·  建議",
+    "init_method_console": "AWS Console Login  ·  暫時性瀏覽器憑證",
+    "init_method_console_unavailable": "AWS Console Login  ·  需要 AWS CLI ≥ 2.32",
+    "init_method_access_key": "Access key  ·  不建議",
+    "init_environment_default_suffix": "dev",
+    "init_error_project_required": "專案名稱為必填。",
+    "init_error_environment_required": "環境名稱為必填。",
+    "init_error_environment_duplicate": "環境 {environment!r} 已經加入。",
+    "init_error_profile_required": "請選擇或建立本機 AWS Profile。",
+    "init_error_region_required": "AWS Region 為必填。",
+    "init_error_profile_name_required": "Profile 名稱為必填。",
+    "init_error_profile_exists": "Profile {profile!r} 已存在，請直接選擇它。",
+    "init_error_one_environment_required": "專案至少需要一個環境。",
+    "init_confirm_access_key": "請再次按下確認動作以繼續。",
+    "init_confirm_discard": "請再次按下取消以捨棄已驗證的草稿。",
+    "unknown_error": "未知錯誤",
+    "guidance_unbound": "請用「綁定」為 {environment} 選擇本機 AWS profile。",
+    "guidance_profile_missing": "本機找不到已綁定的 profile，請重新綁定。",
+    "guidance_ready": "請先驗證此 context；每次啟動工具前都會再次驗證。",
+    "guidance_verifying": "正在驗證 AWS 身分並比對 STS 帳號…",
+    "guidance_verified": "AWS 帳號符合 {project}/{environment}。",
+    "guidance_mismatch": "已阻擋執行，請將環境重新綁定至正確的 profile。",
+    "guidance_error": "修正問題後請執行診斷或重新驗證。",
+    "subtitle_no_project": "尚未初始化專案",
+    "subtitle_configuration_error": "設定錯誤",
+    "onboarding_title": "awsui · 專案初始化",
+    "onboarding_missing": "找不到 .awsui.yaml",
+    "onboarding_body": "請將目前目錄初始化為 awsui 專案，或從現有專案內啟動 awsui。",
+    "onboarding_next": "按 i 或選擇「初始化」。",
+    "load_error_heading": "無法載入專案 context",
+    "load_error_unknown": "未知的設定錯誤",
+    "load_error_next": "請執行診斷並修正檔案後再重新載入。",
+    "load_error_title": "✗ Context 無法使用",
+    "launch_title": "在 {environment} 啟動工具",
+    "launch_warning": "受保護環境 — 啟動前請確認目標帳號。",
+    "launch_custom": "自訂指令",
+    "launch_placeholder": "codex --help",
+    "authenticating": "正在驗證 AWS 身分...",
+    "notification_reloaded": "Dashboard 已重新載入",
+    "notification_init_cancelled": "已取消初始化",
+    "notification_init_failed": "初始化失敗",
+    "notification_initialized": "專案已初始化",
+    "notification_profiles_reloaded": "已重新載入 AWS Profile",
+    "notification_profile_creation_cancelled": "已取消建立 Profile",
+    "notification_profile_created": "已建立 AWS Profile {profile}",
+    "notification_verification_cancelled": "已取消驗證",
+    "notification_environment_verified": "已驗證 {environment}",
+    "notification_environment_removed": "已移除 {environment}",
+    "notification_bind_cancelled": "已取消綁定",
+    "notification_bind_failed": "綁定失敗",
+    "notification_bound": "已更新 {environment} 的綁定",
+    "notification_invalid_command": "指令無效",
+    "notification_mismatch": "AWS 帳號不符，已阻擋執行",
+    "notification_verification_failed": "驗證失敗",
+    "notification_launch_failed": "工具啟動失敗",
+    "notification_cancelled": "操作已取消",
+    "notification_verified": "AWS 身分已驗證",
+    "notification_child_completed": "工具已正常結束",
+    "notification_child_exit": "工具結束，exit code：{code}",
+    "help_text": (
+        "[bold cyan]Context Dashboard[/]\n\n"
+        "[bold]↑/↓[/] 選擇環境\n"
+        "[bold]Enter / v[/] 驗證 AWS 身分\n"
+        "[bold]b[/] 綁定本機 profile\n"
+        "[bold]l[/] 啟動已偵測或自訂工具\n"
+        "[bold]s[/] 開啟已驗證的 shell\n"
+        "[bold]d[/] 執行本機診斷\n"
+        "[bold]r[/] 重新載入專案狀態\n"
+        "[bold]?[/] 說明    [bold]q[/] 離開"
+    ),
 }
