@@ -1,13 +1,12 @@
 # awsui
 
 <p align="center">
-  <img src="images/logo.png" alt="awsui logo" width="400">
+  <img src="docs/images/logo01.png" alt="awsui logo" width="400">
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/awsui/"><img src="https://img.shields.io/pypi/v/awsui?color=blue" alt="PyPI version"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT license"></a>
-  <a href="https://textual.textualize.io/"><img src="https://img.shields.io/badge/TUI-Textual-cyan.svg" alt="Textual"></a>
 </p>
 
 <p align="center">
@@ -28,7 +27,9 @@ You think in environments like `dev` and `prod`. AWS tools expect profile names
 like `company-payment-production-admin`. awsui connects the two, verifies the
 real AWS account, and only then hands control to your tool.
 
-![awsui Context Dashboard](docs/images/demo01.png)
+![awsui CLI workflow overview](docs/images/awsui-cli-promo-16x9.gif)
+
+_See the awsui CLI move from project setup to a verified tool launch._
 
 ## What awsui does for you
 
@@ -78,6 +79,19 @@ awsui --version
 
 If awsui prints the installed version, you are ready for the project setup.
 
+CLI output defaults to English. To switch to Traditional Chinese and remember
+the choice for future commands, run:
+
+```bash
+awsui --lang zh-TW
+```
+
+Run `awsui --lang en` to switch back. You can also put the option before a
+command, for example `awsui --lang zh-TW context prod`. awsui stores this
+preference in `~/.config/awsui/settings.json`; the file contains no AWS
+credentials. Running either language command again also replaces an invalid
+settings file.
+
 ### 2. Set up your project contexts
 
 Move into your project and start the guided setup:
@@ -102,6 +116,10 @@ Project: payment-service
 `.awsui.yaml`, while keeping your machine-specific profile bindings outside the
 repository.
 
+![Initializing awsui project contexts](docs/images/awsui-init-16x9.gif)
+
+_Initialize the shared project contexts from the terminal._
+
 ### 3. Verify the environment you are about to use
 
 Before launching anything, ask awsui to show you the real identity behind
@@ -124,6 +142,10 @@ Status: ✓ VERIFIED
 
 Check that the expected and authenticated accounts match. `VERIFIED` means the
 context is ready; it does not launch a child process yet.
+
+![Verifying an AWS context with awsui](docs/images/awsui-context-16x9.gif)
+
+_Verify the authenticated AWS account before launching a tool._
 
 ### 4. Launch your tool
 
@@ -148,8 +170,11 @@ Launching: codex
 If the authenticated account is wrong, you will see `AWS CONTEXT MISMATCH` and
 `Command was not started.` The tool never receives the incorrect context.
 
-You are set. The visual Context Dashboard is temporarily disabled from the
-default `awsui` entry; run `awsui --help` to see the available CLI commands. Use
+![Launching Codex in a verified AWS context](docs/images/awsui-run-shorthand-16x9.gif)
+
+_Launch Codex only after awsui verifies the selected context._
+
+You are set. Run `awsui --help` to see every available CLI command. Use
 `awsui dev` to open a verified interactive shell.
 
 Bringing a teammate onboard? They reuse the committed project intent and bind
@@ -159,6 +184,10 @@ Bringing a teammate onboard? They reuse the committed project intent and bind
 awsui bind prod
 awsui prod -- claude
 ```
+
+![Binding a local AWS profile to a project environment](docs/images/awsui-bind-16x9.gif)
+
+_Each teammate binds the shared environment name to their own local profile._
 
 ## What your team shares
 
@@ -189,42 +218,14 @@ needing your profile name. awsui stores each machine's private bindings outside
 the repository in `~/.config/awsui/bindings.json`; `.awsui.yaml` must never
 contain credentials.
 
-## Prefer a visual workflow?
-
-The Context Dashboard is temporarily unavailable from the default `awsui` entry.
-The dashboard workflow remains documented here for when the entry is restored;
-for now, use `awsui context ls` or `awsui bind ls` to inspect local project state,
-then verify or launch with the direct CLI commands. Launch and Shell always verify
-the identity again immediately before starting the child process.
-
-When no project exists, **Initialize** opens a full-screen setup wizard. You can
-name the project, add environments, select or create local profiles, verify each
-identity with STS, and review the result before writing any configuration.
-
-| Key | Action |
-| --- | --- |
-| `↑` / `↓` | Select an environment |
-| `Enter` / `v` | Authenticate and verify with STS |
-| `b` | Bind a local profile |
-| `l` | Launch an AI agent, CLI, or custom command |
-| `s` | Open a verified context shell |
-| `d` | Run local diagnostics |
-| `r` | Reload project and profile state |
-| `i` | Initialize when no project exists |
-| `?` | Show help |
-| `q` | Quit |
-
-The Dashboard distinguishes `UNBOUND`, `PROFILE MISSING`, `READY TO VERIFY`,
-`VERIFYING`, `VERIFIED`, `MISMATCH`, and `ERROR`. Protected environments
-are visually emphasized and still require an explicit launch action.
-
-## Prefer direct commands?
+## Command reference
 
 You can do everything from the command line too:
 
 | Command | Purpose |
 | --- | --- |
-| `awsui` | Show CLI help (Context Dashboard temporarily disabled) |
+| `awsui` | Show CLI help |
+| `awsui --lang <zh-TW\|en>` | Set and remember the CLI language |
 | `awsui init` | Initialize verified contexts for a project |
 | `awsui bind <environment>` | Bind an environment to a local AWS profile |
 | `awsui bind ls` | List project environments and local binding status without authenticating |
@@ -249,9 +250,9 @@ awsui run prod -- codex
 awsui shell prod
 ```
 
-The Dashboard custom-command field accepts a command and arguments, not shell
-syntax. Pipes, redirects, `&&`, and other shell operators are rejected; open a
-verified shell when shell composition is required.
+Commands after `--` are launched directly as an argument vector, without shell
+parsing. To use pipes, redirects, `&&`, or other shell composition, first open a
+verified shell with `awsui <environment>`, then run the composed command there.
 
 ## Need a new AWS profile?
 

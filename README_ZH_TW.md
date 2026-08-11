@@ -1,13 +1,12 @@
 # awsui
 
 <p align="center">
-  <img src="images/logo.png" alt="awsui logo" width="400">
+  <img src="docs/images/logo01.png" alt="awsui logo" width="400">
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/awsui/"><img src="https://img.shields.io/pypi/v/awsui?color=blue" alt="PyPI version"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT license"></a>
-  <a href="https://textual.textualize.io/"><img src="https://img.shields.io/badge/TUI-Textual-cyan.svg" alt="Textual"></a>
 </p>
 
 <p align="center">
@@ -28,7 +27,9 @@
 `company-payment-production-admin` 這種 profile 名稱。awsui 會連結兩者、驗證
 真實的 AWS account，確認無誤後才把控制權交給你的工具。
 
-![awsui Context Dashboard](docs/images/demo01.png)
+![awsui CLI 工作流程總覽](docs/images/awsui-cli-promo-16x9.gif)
+
+_從專案初始化到驗證後啟動工具，完整瀏覽 awsui CLI 工作流程。_
 
 ## awsui 幫你處理什麼？
 
@@ -77,6 +78,17 @@ awsui --version
 
 看到 awsui 印出目前安裝的版本後，就可以開始設定專案。
 
+CLI 預設使用英文。執行下面的指令，即可切換成繁體中文，並記住設定供後續指令使用：
+
+```bash
+awsui --lang zh-TW
+```
+
+執行 `awsui --lang en` 可以切回英文。語言選項也可以放在指令前，例如
+`awsui --lang zh-TW context prod`。awsui 只會將語言偏好存放在
+`~/.config/awsui/settings.json`，其中不含任何 AWS credentials。設定檔損壞時，
+重新執行任一語言切換指令也會取代無效的設定。
+
 ### 2. 設定你的專案 contexts
 
 進入專案並啟動引導式設定：
@@ -98,6 +110,10 @@ Project: payment-service
 
 **剛剛發生了什麼？** awsui 將團隊共用的 account 與 region 意圖寫入
 `.awsui.yaml`，但這台機器專屬的 profile binding 仍然放在 repository 外。
+
+![初始化 awsui 專案 contexts](docs/images/awsui-init-16x9.gif)
+
+_直接在 terminal 建立團隊共用的專案 contexts。_
 
 ### 3. 啟動工具前先驗證環境
 
@@ -121,6 +137,10 @@ Status: ✓ VERIFIED
 請確認 expected 與 authenticated account 相同。`VERIFIED` 代表 context 已準備好，
 這一步還不會啟動任何 child process。
 
+![使用 awsui 驗證 AWS context](docs/images/awsui-context-16x9.gif)
+
+_啟動工具前，先驗證目前登入的 AWS account。_
+
 ### 4. 啟動你的工具
 
 現在可以帶上任何你想使用的工具：
@@ -143,9 +163,12 @@ Launching: codex
 如果登入的 account 不正確，你會看到 `AWS CONTEXT MISMATCH` 與
 `Command was not started.`，工具不會拿到錯誤的 context。
 
-這樣就完成了。目前視覺化的 Context Dashboard 暫時不從預設的 `awsui` 入口啟動；
-執行 `awsui --help` 可以查看可用的 CLI 指令。想開啟已驗證的互動 shell 時，
-直接執行 `awsui dev`。
+![在已驗證的 AWS context 中啟動 Codex](docs/images/awsui-run-shorthand-16x9.gif)
+
+_awsui 驗證所選 context 後，才會啟動 Codex。_
+
+這樣就完成了。執行 `awsui --help` 可以查看所有可用的 CLI 指令。想開啟已驗證的
+互動 shell 時，直接執行 `awsui dev`。
 
 要讓另一位開發者加入？他只需沿用已提交的專案意圖，再將 `prod` 綁定到自己的
 本機 profile：
@@ -154,6 +177,10 @@ Launching: codex
 awsui bind prod
 awsui prod -- claude
 ```
+
+![將本機 AWS profile 綁定到專案環境](docs/images/awsui-bind-16x9.gif)
+
+_每位隊友都能將共用環境名稱綁定到自己的本機 profile。_
 
 ## 團隊要共用什麼？
 
@@ -183,40 +210,14 @@ contexts:
 名稱。awsui 會將每台機器的 private bindings 存放在 repository 外的
 `~/.config/awsui/bindings.json`；`.awsui.yaml` 絕對不能包含 credentials。
 
-## 偏好視覺化操作？
-
-目前 Context Dashboard 暫時不從預設的 `awsui` 入口啟動。這裡仍保留 Dashboard
-流程說明，待入口恢復後即可使用；目前請用 `awsui context ls` 或 `awsui bind ls`
-檢視本機專案狀態，再使用直接的 CLI 指令驗證或啟動。Launch 與 Shell 都會在
-child process 啟動前再次驗證身份。
-
-找不到專案時，**初始化**會開啟全畫面的設定 wizard。你可以命名專案、加入環境、
-選擇或建立本機 profile、透過 STS 驗證每個身份，並在寫入設定前確認結果。
-
-| 按鍵 | 動作 |
-| --- | --- |
-| `↑` / `↓` | 選擇環境 |
-| `Enter` / `v` | 登入並透過 STS 驗證 |
-| `b` | 綁定本機 profile |
-| `l` | 啟動 AI agent、CLI 或自訂指令 |
-| `s` | 開啟已驗證的 context shell |
-| `d` | 執行本機診斷 |
-| `r` | 重新載入專案與 profile 狀態 |
-| `i` | 找不到專案時進行初始化 |
-| `?` | 顯示說明 |
-| `q` | 離開 |
-
-Dashboard 會區分 `UNBOUND`、`PROFILE MISSING`、`READY TO VERIFY`、
-`VERIFYING`、`VERIFIED`、`MISMATCH` 與 `ERROR`。受保護環境會醒目顯示，
-且仍需要明確執行 launch 動作。
-
-## 偏好直接輸入指令？
+## 指令參考
 
 你也可以完全透過 command line 操作：
 
 | 指令 | 用途 |
 | --- | --- |
-| `awsui` | 顯示 CLI help（Context Dashboard 暫時停用） |
+| `awsui` | 顯示 CLI help |
+| `awsui --lang <zh-TW\|en>` | 設定並記住 CLI 語言 |
 | `awsui init` | 初始化專案的已驗證 contexts |
 | `awsui bind <environment>` | 將環境綁定到本機 AWS profile |
 | `awsui bind ls` | 列出專案環境與本機 binding 狀態，不進行驗證 |
@@ -241,9 +242,9 @@ awsui run prod -- codex
 awsui shell prod
 ```
 
-Dashboard 的自訂指令欄只接受 command 與 arguments，不接受 shell 語法。
-Pipe、redirect、`&&` 等 operator 會被拒絕；需要組合 shell 指令時，請開啟
-已驗證的 shell。
+`--` 後方的 command 會直接以 argument vector 啟動，不會經過 shell 解析。
+需要 pipe、redirect、`&&` 或其他 shell 組合語法時，請先執行
+`awsui <environment>` 開啟已驗證的 shell，再從該 shell 執行組合指令。
 
 ## 還沒有需要的 AWS profile？
 

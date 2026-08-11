@@ -49,4 +49,6 @@ Thumbs.db
 docs/prd/
 
 # Local, snapshot-locked commit helpers
-scripts/commit-v02-checkpoints.sh
+scripts/
+
+.awsui.yaml
