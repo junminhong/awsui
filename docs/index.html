@@ -40,7 +40,7 @@
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="awsui Context Dashboard showing verified project environments and AWS identities"
+      content="awsui verifies the selected AWS context before launching an AI agent or CLI tool"
     />
 
     <meta name="twitter:card" content="summary_large_image" />
@@ -62,7 +62,7 @@
     />
     <meta
       name="twitter:image:alt"
-      content="awsui Context Dashboard showing verified project environments and AWS identities"
+      content="awsui verifies the selected AWS context before launching an AI agent or CLI tool"
     />
 
     <title>awsui — Verified AWS Contexts for AI Agents &amp; CLI Tools</title>
@@ -146,7 +146,7 @@
         <div class="nav-menu" id="navMenu">
           <a class="nav-link" href="#workflow">How it works</a>
           <a class="nav-link" href="#features">Features</a>
-          <a class="nav-link" href="#demo">TUI</a>
+          <a class="nav-link" href="#demo">Demo</a>
           <a class="nav-link" href="#docs">Docs</a>
           <a
             class="nav-github"
@@ -432,51 +432,78 @@
         </div>
       </section>
 
-      <section class="section tui-section" id="demo">
-        <div class="container tui-grid">
-          <div class="tui-copy reveal">
-            <p class="section-kicker">Context Dashboard</p>
-            <h2>See every project environment at a glance.</h2>
+      <section class="section demo-section" id="demo">
+        <div class="container">
+          <div class="section-heading reveal">
+            <p class="section-kicker">CLI walkthrough</p>
+            <h2>From project setup to a verified tool launch.</h2>
             <p>
-              The Context Dashboard is temporarily paused at the default
-              <code>awsui</code> entry. Run <code>awsui --help</code> for the
-              current CLI commands, or use <code>awsui context ls</code> to
-              inspect local project state.
+              Define the project once, keep profile bindings local, and verify
+              the real AWS identity before any child process starts.
             </p>
-            <ul class="check-list">
-              <li>Clear ready, verified, mismatch, and error states</li>
-              <li>Expected and authenticated account details</li>
-              <li>Keyboard-first bind, verify, launch, shell, and doctor actions</li>
-            </ul>
-            <a
-              class="text-link"
-              href="https://github.com/junminhong/awsui#-features"
-              target="_blank"
-              rel="noopener"
-            >
-              View the Context Dashboard preview <span aria-hidden="true">↗</span>
-            </a>
           </div>
 
-          <figure class="tui-preview reveal">
-            <button
-              class="image-open"
-              type="button"
-              data-dialog-open="demoDialog"
-              aria-label="Expand the awsui TUI screenshot"
-            >
+          <div class="demo-grid">
+            <figure class="demo-card reveal">
               <img
-                src="images/demo01.png"
-                alt="awsui Context Dashboard ready to initialize a project"
-                width="2532"
-                height="1371"
+                src="images/awsui-init-16x9.gif"
+                alt="Terminal demonstration of awsui init creating shared project contexts"
+                width="1920"
+                height="1080"
                 loading="lazy"
                 decoding="async"
               />
-              <span>Expand screenshot</span>
-            </button>
-            <figcaption>Start a project from the Context Dashboard.</figcaption>
-          </figure>
+              <figcaption>
+                <span class="demo-step">01 · Initialize</span>
+                Create the shared project contexts.
+              </figcaption>
+            </figure>
+
+            <figure class="demo-card reveal">
+              <img
+                src="images/awsui-bind-16x9.gif"
+                alt="Terminal demonstration of binding a local AWS profile to an awsui environment"
+                width="1920"
+                height="1080"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption>
+                <span class="demo-step">02 · Bind</span>
+                Map the environment to a local AWS profile.
+              </figcaption>
+            </figure>
+
+            <figure class="demo-card reveal">
+              <img
+                src="images/awsui-context-16x9.gif"
+                alt="Terminal demonstration of awsui verifying the authenticated AWS account"
+                width="1920"
+                height="1080"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption>
+                <span class="demo-step">03 · Verify</span>
+                Confirm the authenticated account matches.
+              </figcaption>
+            </figure>
+
+            <figure class="demo-card reveal">
+              <img
+                src="images/awsui-run-shorthand-16x9.gif"
+                alt="Terminal demonstration of awsui launching Codex after AWS identity verification"
+                width="1920"
+                height="1080"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption>
+                <span class="demo-step">04 · Launch</span>
+                Start Codex inside the verified context.
+              </figcaption>
+            </figure>
+          </div>
         </div>
       </section>
 
@@ -568,42 +595,62 @@ contexts:
             <p>Short answers for teams bringing AI agents and CLI tools into AWS.</p>
           </div>
 
-          <div class="faq-grid">
-            <article class="faq-card reveal">
-              <h3>What does awsui mean by an AWS context?</h3>
-              <p>
-                A named project environment such as dev or prod. It declares the
-                expected 12-digit AWS account and region, then maps that shared
-                intent to a local AWS profile.
-              </p>
-            </article>
+          <div class="faq-list">
+            <details class="faq-item reveal">
+              <summary>
+                <span class="faq-question">What does awsui mean by an AWS context?</span>
+                <span class="faq-toggle" aria-hidden="true"></span>
+              </summary>
+              <div class="faq-answer">
+                <p>
+                  A named project environment such as dev or prod. It declares the
+                  expected 12-digit AWS account and region, then maps that shared
+                  intent to a local AWS profile.
+                </p>
+              </div>
+            </details>
 
-            <article class="faq-card reveal">
-              <h3>How does awsui verify the AWS account before launch?</h3>
-              <p>
-                It authenticates the bound profile, queries AWS STS caller identity,
-                compares the returned account with the project configuration, and
-                aborts when identity is unavailable or mismatched.
-              </p>
-            </article>
+            <details class="faq-item reveal">
+              <summary>
+                <span class="faq-question">How does awsui verify the AWS account before launch?</span>
+                <span class="faq-toggle" aria-hidden="true"></span>
+              </summary>
+              <div class="faq-answer">
+                <p>
+                  It authenticates the bound profile, queries AWS STS caller identity,
+                  compares the returned account with the project configuration, and
+                  aborts when identity is unavailable or mismatched.
+                </p>
+              </div>
+            </details>
 
-            <article class="faq-card reveal">
-              <h3>Does awsui store AWS credentials?</h3>
-              <p>
-                No. awsui uses the credentials and SSO sessions already managed by
-                AWS CLI, prepares a deterministic child environment, and does not
-                persist AWS access keys or session tokens.
-              </p>
-            </article>
+            <details class="faq-item reveal">
+              <summary>
+                <span class="faq-question">Does awsui store AWS credentials?</span>
+                <span class="faq-toggle" aria-hidden="true"></span>
+              </summary>
+              <div class="faq-answer">
+                <p>
+                  No. awsui uses the credentials and SSO sessions already managed by
+                  AWS CLI, prepares a deterministic child environment, and does not
+                  persist AWS access keys or session tokens.
+                </p>
+              </div>
+            </details>
 
-            <article class="faq-card reveal">
-              <h3>Which AI agents and CLI tools can awsui launch?</h3>
-              <p>
-                Any child process can run inside a verified context, including Codex,
-                Claude Code, Kiro, Antigravity, Terraform, and AWS CLI. awsui supports
-                macOS, Linux, and Windows wherever Python 3.13 and AWS CLI v2 are available.
-              </p>
-            </article>
+            <details class="faq-item reveal">
+              <summary>
+                <span class="faq-question">Which AI agents and CLI tools can awsui launch?</span>
+                <span class="faq-toggle" aria-hidden="true"></span>
+              </summary>
+              <div class="faq-answer">
+                <p>
+                  Any child process can run inside a verified context, including Codex,
+                  Claude Code, Kiro, Antigravity, Terraform, and AWS CLI. awsui supports
+                  macOS, Linux, and Windows wherever Python 3.13 and AWS CLI v2 are available.
+                </p>
+              </div>
+            </details>
           </div>
         </div>
       </section>
@@ -692,24 +739,9 @@ contexts:
       </div>
       <div class="container footer-bottom">
         <p>© 2026 junminhong (jasper).</p>
-        <p>Built for AWS developers who would rather think in environments.</p>
+        <p>Built for developers who need the right AWS context, every time.</p>
       </div>
     </footer>
-
-    <dialog class="image-dialog" id="demoDialog" aria-label="Expanded awsui TUI screenshot">
-      <div class="dialog-toolbar">
-        <span>awsui Context Dashboard</span>
-        <button type="button" data-dialog-close aria-label="Close screenshot">Close</button>
-      </div>
-      <img
-        src="images/demo01.png"
-        alt="Expanded awsui Context Dashboard ready to initialize a project"
-        width="2532"
-        height="1371"
-        loading="lazy"
-        decoding="async"
-      />
-    </dialog>
 
     <div class="copy-status sr-only" aria-live="polite" id="copyStatus"></div>
     <script src="script.js"></script>

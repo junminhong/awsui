@@ -291,52 +291,12 @@
     });
   }
 
-  function initImageDialog() {
-    const openers = document.querySelectorAll('[data-dialog-open]');
-
-    openers.forEach(function (opener) {
-      opener.addEventListener('click', function () {
-        const dialog = document.getElementById(opener.dataset.dialogOpen);
-        if (!dialog) {
-          return;
-        }
-
-        if (typeof dialog.showModal === 'function') {
-          dialog.showModal();
-          return;
-        }
-
-        const image = dialog.querySelector('img');
-        if (image) {
-          window.open(image.src, '_blank', 'noopener');
-        }
-      });
-    });
-
-    document.querySelectorAll('dialog').forEach(function (dialog) {
-      const closeButton = dialog.querySelector('[data-dialog-close]');
-
-      if (closeButton) {
-        closeButton.addEventListener('click', function () {
-          dialog.close();
-        });
-      }
-
-      dialog.addEventListener('click', function (event) {
-        if (event.target === dialog) {
-          dialog.close();
-        }
-      });
-    });
-  }
-
   function init() {
     initNavigation();
     initActiveNavigation();
     initTerminalSequence();
     initRevealAnimations();
     initCopyButtons();
-    initImageDialog();
   }
 
   if (document.readyState === 'loading') {
