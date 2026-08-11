@@ -81,7 +81,8 @@ class TestRunCommand:
         )
 
         assert exit_code == 4
-        assert capfd.readouterr().out == "company-prod\nclean\n"
+        output = capfd.readouterr().out.replace("\r\n", "\n")
+        assert output == "company-prod\nclean\n"
 
 
 class TestSelectInteractiveShell:
