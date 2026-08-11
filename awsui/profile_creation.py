@@ -231,9 +231,7 @@ def _select_creation_method(
 
     output = CliConsole(stdout)
     while True:
-        console_status = (
-            "" if console_available else f" [{text('cli_requires_cli')}]"
-        )
+        console_status = "" if console_available else f" [{text('cli_requires_cli')}]"
         print(f"{text('cli_auth_method')}:", file=stdout)
         print(f"  1. {text('cli_sso_recommended')}", file=stdout)
         print(f"  2. {text('cli_console_login')}{console_status}", file=stdout)

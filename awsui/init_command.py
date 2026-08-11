@@ -116,9 +116,7 @@ def initialize_project(
             )
             continue
         if environment_name in names:
-            message = text(
-                "cli_environment_duplicate", environment=environment_name
-            )
+            message = text("cli_environment_duplicate", environment=environment_name)
             output.print(
                 safe_text(message, "awsui.warning"),
                 plain=message,

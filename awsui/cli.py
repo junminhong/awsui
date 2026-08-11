@@ -437,9 +437,7 @@ def _dispatch(args: Namespace) -> int:
                 render_failure_rich(
                     text("cli_command_required"),
                     message,
-                    next_step=text(
-                        "cli_run_help_usage", environment=args.environment
-                    ),
+                    next_step=text("cli_run_help_usage", environment=args.environment),
                 ),
                 plain=message,
             )
