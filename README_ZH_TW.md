@@ -143,8 +143,9 @@ Launching: codex
 如果登入的 account 不正確，你會看到 `AWS CONTEXT MISMATCH` 與
 `Command was not started.`，工具不會拿到錯誤的 context。
 
-這樣就完成了。想使用視覺化的 Context Dashboard 時執行 `awsui`；想開啟已驗證
-的互動 shell 時，直接執行 `awsui dev`。
+這樣就完成了。目前視覺化的 Context Dashboard 暫時不從預設的 `awsui` 入口啟動；
+執行 `awsui --help` 可以查看可用的 CLI 指令。想開啟已驗證的互動 shell 時，
+直接執行 `awsui dev`。
 
 要讓另一位開發者加入？他只需沿用已提交的專案意圖，再將 `prod` 綁定到自己的
 本機 profile：
@@ -184,8 +185,10 @@ contexts:
 
 ## 偏好視覺化操作？
 
-在你的專案內執行 `awsui`，就能在不呼叫 AWS 的情況下檢視所有環境，再用鍵盤
-完成驗證或啟動。Launch 與 Shell 都會在 child process 啟動前再次驗證身份。
+目前 Context Dashboard 暫時不從預設的 `awsui` 入口啟動。這裡仍保留 Dashboard
+流程說明，待入口恢復後即可使用；目前請用 `awsui context ls` 或 `awsui bind ls`
+檢視本機專案狀態，再使用直接的 CLI 指令驗證或啟動。Launch 與 Shell 都會在
+child process 啟動前再次驗證身份。
 
 找不到專案時，**初始化**會開啟全畫面的設定 wizard。你可以命名專案、加入環境、
 選擇或建立本機 profile、透過 STS 驗證每個身份，並在寫入設定前確認結果。
@@ -213,7 +216,7 @@ Dashboard 會區分 `UNBOUND`、`PROFILE MISSING`、`READY TO VERIFY`、
 
 | 指令 | 用途 |
 | --- | --- |
-| `awsui` | 開啟 Context Dashboard |
+| `awsui` | 顯示 CLI help（Context Dashboard 暫時停用） |
 | `awsui init` | 初始化專案的已驗證 contexts |
 | `awsui bind <environment>` | 將環境綁定到本機 AWS profile |
 | `awsui bind ls` | 列出專案環境與本機 binding 狀態，不進行驗證 |

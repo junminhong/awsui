@@ -322,20 +322,18 @@ class TestParseArgs:
 
 
 class TestMain:
-    """Tests for CLI-to-TUI dispatch."""
+    """Tests for CLI dispatch."""
 
-    @patch("awsui.cli.run_tui")
-    def test_default_options_launch_tui(self, mock_run_tui):
+    def test_default_options_show_cli_help(self, capsys):
         exit_code = main([])
 
         assert exit_code == 0
-        mock_run_tui.assert_called_once_with(
-            lang="en",
-            log_level="INFO",
-        )
+        output = capsys.readouterr().out
+        assert "Usage: awsui" in output
+        assert "context" in output
+        assert "bind" in output
 
-    @patch("awsui.cli.run_tui")
-    def test_explicit_options_launch_tui(self, mock_run_tui):
+    def test_explicit_options_show_cli_help(self, capsys):
         exit_code = main(
             [
                 "--lang",
@@ -346,10 +344,10 @@ class TestMain:
         )
 
         assert exit_code == 0
-        mock_run_tui.assert_called_once_with(
-            lang="zh-TW",
-            log_level="DEBUG",
-        )
+        output = capsys.readouterr().out
+        assert "Usage: awsui" in output
+        assert "--lang {zh-TW,en}" in output
+        assert "--log-level {DEBUG,INFO,WARNING,ERROR}" in output
 
     @patch("awsui.cli.main", return_value=7)
     def test_app_module_entry_point_delegates_to_cli(self, mock_cli_main):
@@ -562,14 +560,12 @@ class TestMain:
         assert exit_code == 130
         assert "awsui bind: binding cancelled" in capsys.readouterr().err
 
-    @patch("awsui.cli.run_tui")
     @patch("awsui.cli.prepare_resolved_runtime")
     @patch("awsui.cli.resolve_context")
     def test_context_success(
         self,
         mock_resolve,
         mock_prepare,
-        mock_run_tui,
         capsys,
     ):
         resolved = resolved_context()
@@ -598,7 +594,6 @@ class TestMain:
         mock_resolve.assert_called_once_with("prod")
         assert mock_prepare.call_args.args == (resolved,)
         assert mock_prepare.call_args.kwargs["login_output"] is not None
-        mock_run_tui.assert_not_called()
 
     @patch("awsui.cli.prepare_resolved_runtime")
     @patch("awsui.cli.load_dashboard")

@@ -9,7 +9,6 @@ import sys
 from rich_argparse import RawDescriptionRichHelpFormatter
 
 from . import __version__
-from .app import run_tui
 from .bind_command import (
     BindCommandCancelled,
     BindCommandError,
@@ -241,7 +240,7 @@ def _normalize_shorthand(argv: list[str]) -> tuple[list[str], str | None]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Dispatch an awsui command or launch the Textual TUI."""
+    """Dispatch an awsui command or show CLI help when none is selected."""
     args = parse_args(argv)
 
     if args.command is not None:
@@ -309,10 +308,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "doctor":
         return _run_doctor()
 
-    run_tui(
-        lang=args.lang,
-        log_level=args.log_level,
-    )
+    build_parser().print_help()
     return 0
 
 

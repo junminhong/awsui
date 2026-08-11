@@ -148,8 +148,9 @@ Launching: codex
 If the authenticated account is wrong, you will see `AWS CONTEXT MISMATCH` and
 `Command was not started.` The tool never receives the incorrect context.
 
-You are set. Run `awsui` whenever you prefer the visual Context Dashboard, or
-use `awsui dev` to open a verified interactive shell.
+You are set. The visual Context Dashboard is temporarily disabled from the
+default `awsui` entry; run `awsui --help` to see the available CLI commands. Use
+`awsui dev` to open a verified interactive shell.
 
 Bringing a teammate onboard? They reuse the committed project intent and bind
 `prod` to their own local profile:
@@ -190,9 +191,11 @@ contain credentials.
 
 ## Prefer a visual workflow?
 
-Run `awsui` inside your project. You can inspect every environment without
-making an AWS request, then verify or launch with the keyboard. Launch and Shell
-always verify the identity again immediately before starting the child process.
+The Context Dashboard is temporarily unavailable from the default `awsui` entry.
+The dashboard workflow remains documented here for when the entry is restored;
+for now, use `awsui context ls` or `awsui bind ls` to inspect local project state,
+then verify or launch with the direct CLI commands. Launch and Shell always verify
+the identity again immediately before starting the child process.
 
 When no project exists, **Initialize** opens a full-screen setup wizard. You can
 name the project, add environments, select or create local profiles, verify each
@@ -221,7 +224,7 @@ You can do everything from the command line too:
 
 | Command | Purpose |
 | --- | --- |
-| `awsui` | Open the Context Dashboard |
+| `awsui` | Show CLI help (Context Dashboard temporarily disabled) |
 | `awsui init` | Initialize verified contexts for a project |
 | `awsui bind <environment>` | Bind an environment to a local AWS profile |
 | `awsui bind ls` | List project environments and local binding status without authenticating |
