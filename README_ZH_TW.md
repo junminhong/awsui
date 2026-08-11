@@ -216,6 +216,8 @@ Dashboard 會區分 `UNBOUND`、`PROFILE MISSING`、`READY TO VERIFY`、
 | `awsui` | 開啟 Context Dashboard |
 | `awsui init` | 初始化專案的已驗證 contexts |
 | `awsui bind <environment>` | 將環境綁定到本機 AWS profile |
+| `awsui bind ls` | 列出專案環境與本機 binding 狀態，不進行驗證 |
+| `awsui bind ls --json` | 以 JSON 輸出本機 binding 列表 |
 | `awsui context ls` | 列出專案 contexts 與本機 binding 狀態，不進行驗證 |
 | `awsui context ls --json` | 以 JSON 輸出本機 context 列表 |
 | `awsui context <environment>` | 登入、驗證並顯示 context |
@@ -224,9 +226,10 @@ Dashboard 會區分 `UNBOUND`、`PROFILE MISSING`、`READY TO VERIFY`、
 | `awsui <environment>` | 開啟已驗證的互動 shell |
 | `awsui doctor` | 不觸發登入，診斷本機設定 |
 
-使用 `awsui context ls`（或 `awsui context list`）可以查看每個 context 的預期
-account、region、受保護標記與本機 profile 狀態。這是只讀的本機列表，不會呼叫
-AWS；需要透過 STS 驗證單一 context 時，再執行 `awsui context <environment>`。
+使用 `awsui context ls`/`list` 或 `awsui bind ls`/`list`，可以查看每個 context
+的預期 account、region、受保護標記與本機 profile 狀態。這些都是只讀的本機列表，
+不會呼叫 AWS；需要透過 STS 驗證單一 context 時，再執行
+`awsui context <environment>`。
 
 完整命令形式仍然可用：
 

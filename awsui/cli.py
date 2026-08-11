@@ -67,6 +67,7 @@ from .tui_context import load_dashboard
 
 
 _COMMANDS = frozenset({"init", "bind", "context", "run", "shell", "doctor"})
+_BIND_LIST_ALIASES = frozenset({"ls", "list"})
 _CONTEXT_LIST_ALIASES = frozenset({"ls", "list"})
 _HELP_EPILOG = """\
 Quick start:
@@ -152,11 +153,19 @@ def build_parser() -> ArgumentParser:
     )
     bind_parser = subparsers.add_parser(
         "bind",
-        help="Bind a project environment to a local AWS profile",
-        description="Bind a project environment to a local AWS profile",
+        help="Bind or list project environment AWS profiles",
+        description="Bind or list project environment AWS profiles",
         formatter_class=AwsuiHelpFormatter,
     )
-    bind_parser.add_argument("environment", help="Project environment to bind")
+    bind_parser.add_argument(
+        "environment",
+        help="Environment to bind, or `ls`/`list` to list bindings",
+    )
+    bind_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output the binding list as JSON (only with `ls`/`list`)",
+    )
 
     context_parser = subparsers.add_parser(
         "context",
@@ -254,6 +263,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
 
     if args.command == "bind":
+        if args.environment in _BIND_LIST_ALIASES:
+            return _run_context_list(json_output=args.json, command_name="bind")
+        if args.json:
+            message = (
+                "awsui bind: error: `--json` is only valid with "
+                "`awsui bind ls` or `awsui bind list`"
+            )
+            CliConsole(sys.stderr).print(
+                render_failure_rich(
+                    "Invalid bind options",
+                    message,
+                    next_step="Run `awsui bind ls --json` to list local bindings.",
+                ),
+                plain=message,
+            )
+            return 2
         return _run_bind(args.environment)
 
     if args.command == "init":
@@ -367,7 +392,11 @@ def _run_doctor() -> int:
     return 0 if report.healthy else 1
 
 
-def _run_context_list(*, json_output: bool = False) -> int:
+def _run_context_list(
+    *,
+    json_output: bool = False,
+    command_name: str = "context",
+) -> int:
     try:
         snapshot = load_dashboard()
     except (ProjectConfigError, LocalBindingsError, ProfileCatalogError) as exc:
@@ -376,7 +405,7 @@ def _run_context_list(*, json_output: bool = False) -> int:
             if isinstance(exc, ProjectConfigNotFoundError)
             else "Run `awsui doctor` and fix the reported configuration issue."
         )
-        message = f"awsui context: error: {exc}"
+        message = f"awsui {command_name}: error: {exc}"
         CliConsole(sys.stderr).print(
             render_failure_rich(
                 "Unable to list project contexts",

@@ -205,6 +205,22 @@ class TestParseArgs:
 
         assert args.command == "bind"
         assert args.environment == "prod"
+        assert args.json is False
+
+    @pytest.mark.parametrize("alias", ["ls", "list"])
+    def test_bind_list_aliases(self, alias):
+        args = parse_args(["bind", alias])
+
+        assert args.command == "bind"
+        assert args.environment == alias
+        assert args.json is False
+
+    def test_bind_list_json(self):
+        args = parse_args(["bind", "ls", "--json"])
+
+        assert args.command == "bind"
+        assert args.environment == "ls"
+        assert args.json is True
 
     def test_bind_requires_environment(self):
         with pytest.raises(SystemExit) as exc_info:
@@ -357,6 +373,73 @@ class TestMain:
         assert exit_code == 0
         assert capsys.readouterr().out == "Bound payment-service/prod → company-prod\n"
         mock_bind.assert_called_once_with("prod")
+
+    @patch("awsui.cli.bind_environment")
+    @patch("awsui.cli.load_dashboard")
+    def test_bind_list_success(self, mock_load_dashboard, mock_bind, capsys):
+        mock_load_dashboard.return_value = dashboard_snapshot()
+
+        exit_code = main(["bind", "ls"])
+
+        assert exit_code == 0
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        assert "Project: payment-service" in captured.out
+        assert "company-dev" in captured.out
+        assert "PROFILE MISSING" in captured.out
+        assert "UNBOUND" in captured.out
+        assert "PROTECTED" in captured.out
+        mock_load_dashboard.assert_called_once_with()
+        mock_bind.assert_not_called()
+
+    @patch("awsui.cli.bind_environment")
+    @patch("awsui.cli.load_dashboard")
+    def test_bind_list_json_matches_context_list_schema(
+        self,
+        mock_load_dashboard,
+        mock_bind,
+        capsys,
+    ):
+        mock_load_dashboard.return_value = dashboard_snapshot()
+
+        exit_code = main(["bind", "list", "--json"])
+
+        assert exit_code == 0
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        payload = json.loads(captured.out)
+        assert list(payload) == ["project", "contexts"]
+        assert payload["project"] == "payment-service"
+        assert [context["environment"] for context in payload["contexts"]] == [
+            "dev",
+            "qa",
+            "prod",
+        ]
+        assert payload["contexts"][1]["status"] == "profile-missing"
+        mock_load_dashboard.assert_called_once_with()
+        mock_bind.assert_not_called()
+
+    @patch("awsui.cli.load_dashboard")
+    def test_bind_list_source_error_returns_one(self, mock_load_dashboard, capsys):
+        mock_load_dashboard.side_effect = ProfileCatalogError("profiles unavailable")
+
+        exit_code = main(["bind", "ls"])
+
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "awsui bind: error: profiles unavailable" in captured.err
+        assert "awsui doctor" in captured.err
+
+    @patch("awsui.cli.bind_environment")
+    def test_bind_json_is_restricted_to_list_aliases(self, mock_bind, capsys):
+        exit_code = main(["bind", "prod", "--json"])
+
+        assert exit_code == 2
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "only valid with `awsui bind ls` or `awsui bind list`" in captured.err
+        mock_bind.assert_not_called()
 
     @patch("awsui.cli.initialize_project")
     def test_init_success(self, mock_initialize, capsys):
