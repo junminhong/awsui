@@ -235,9 +235,7 @@ LANG_ZH_TW = {
     "init_verify_status": "正在驗證 {profile} 並呼叫 STS…",
     "init_cancelling_verification": "正在安全取消驗證…",
     "init_review_title": "確認專案 Context",
-    "init_review_help": (
-        "以下帳號都已透過 STS 驗證；只有建立專案時才會寫入共用設定。"
-    ),
+    "init_review_help": ("以下帳號都已透過 STS 驗證；只有建立專案時才會寫入共用設定。"),
     "init_progress_project": "01  專案   ·   02  環境   ·   03  驗證   ·   04  確認",
     "init_progress_context": "01  專案   ·   02  環境   ·   03  驗證   ·   04  確認",
     "init_progress_profile": "01  專案   ·   02  PROFILE 設定   ·   返回環境",

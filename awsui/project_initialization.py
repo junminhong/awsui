@@ -69,7 +69,9 @@ class InitResult:
     environments: tuple[InitializedEnvironment, ...]
 
 
-def resolve_initialization_target(start_dir: Path | None = None) -> InitializationTarget:
+def resolve_initialization_target(
+    start_dir: Path | None = None,
+) -> InitializationTarget:
     """Resolve and validate the directory that will receive ``.awsui.yaml``."""
     requested = Path.cwd() if start_dir is None else Path(start_dir)
     try:

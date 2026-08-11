@@ -108,7 +108,7 @@ def test_tty_renders_structure_color_and_dynamic_markup_literally():
 
     assert "\x1b[" in output
     assert "project[prod] [bold red]literal[/]" in output
-    assert "╭" in output
+    assert any(corner in output for corner in ("╭", "┌"))
 
 
 def test_no_color_disables_all_ansi_control_sequences():
@@ -305,7 +305,7 @@ def test_human_context_command_uses_rich_on_a_tty(
         exit_code = main(["context", "prod"])
 
     assert exit_code == 0
-    assert "╭" in stdout.getvalue()
+    assert any(corner in stdout.getvalue() for corner in ("╭", "┌"))
     assert "PROTECTED" in stdout.getvalue()
     assert "AWS identity verified" in stdout.getvalue()
     assert "\x1b[" in stdout.getvalue()

@@ -320,7 +320,9 @@ class InitializationScreen(Screen[InitScreenOutcome | None]):
                     self._text("init_create_profile_help"), classes="init-help"
                 )
                 yield OptionList(id="init-method-list", markup=False)
-                yield Static(self._text("init_profile_name_label"), classes="init-label")
+                yield Static(
+                    self._text("init_profile_name_label"), classes="init-label"
+                )
                 yield Input(id="init-new-profile-name")
                 yield Static(
                     self._text("init_access_key_warning"),
@@ -619,9 +621,9 @@ class InitializationScreen(Screen[InitScreenOutcome | None]):
     def _open_profile_creation(self) -> None:
         environment = self.query_one("#init-environment-name", Input).value.strip()
         suffix = environment or self._text("init_environment_default_suffix")
-        self.query_one("#init-new-profile-name", Input).value = (
-            f"{self.project}-{suffix}"
-        )
+        self.query_one(
+            "#init-new-profile-name", Input
+        ).value = f"{self.project}-{suffix}"
         self._set_error("#init-create-error", None)
         self.access_key_confirmed = False
         self._show_step(InitWizardStep.CREATE_PROFILE)
@@ -873,7 +875,9 @@ class InitializationScreen(Screen[InitScreenOutcome | None]):
             lines.append(f"{label:<20}", style=TUI_RICH_STYLES.label)
             lines.append(f"{value}\n", style=TUI_RICH_STYLES.value)
         if item.principal_arn:
-            lines.append(f"{self._text('field_principal'):<20}", style=TUI_RICH_STYLES.label)
+            lines.append(
+                f"{self._text('field_principal'):<20}", style=TUI_RICH_STYLES.label
+            )
             lines.append(item.principal_arn, style=TUI_RICH_STYLES.muted)
         self.query_one("#init-review-detail", Static).update(lines)
 

@@ -333,7 +333,7 @@ class TestMain:
 
         assert exit_code == 0
         output = capsys.readouterr().out
-        assert "Created /project/.awsui.yaml" in output
+        assert f"Created {Path('/project/.awsui.yaml')}" in output
         assert "dev: 111111111111 · us-east-1" in output
         assert "prod: 999999999999 · ap-northeast-1 · PROTECTED" in output
 
