@@ -15,6 +15,7 @@ from awsui.cli_presenter import (
     render_bind_result_rich,
     render_doctor_report,
     render_doctor_report_rich,
+    render_context_list_rich,
     render_init_result_rich,
     render_launch_context_rich,
     render_verified_context_rich,
@@ -35,6 +36,7 @@ from awsui.profile_selection import (
     ProfileChoiceKind,
     select_or_create_profile,
 )
+from awsui.tui_context import ContextItem, ContextStatus, DashboardSnapshot
 
 
 class TerminalBuffer(StringIO):
@@ -79,6 +81,32 @@ def _verified_context(
     )
 
 
+def _dashboard_snapshot() -> DashboardSnapshot:
+    return DashboardSnapshot(
+        project="payment-service",
+        config_path=Path("/project/.awsui.yaml"),
+        bindings_path=Path("/home/user/.config/awsui/bindings.json"),
+        contexts=(
+            ContextItem(
+                name="dev",
+                expected_account="111111111111",
+                region="us-east-1",
+                protected=False,
+                profile="company-dev",
+                status=ContextStatus.READY,
+            ),
+            ContextItem(
+                name="prod",
+                expected_account="999999999999",
+                region="ap-northeast-1",
+                protected=True,
+                profile=None,
+                status=ContextStatus.UNBOUND,
+            ),
+        ),
+    )
+
+
 def _render(renderable, *, environment=None) -> str:
     stream = StringIO()
     CliConsole(
@@ -119,6 +147,17 @@ def test_no_color_disables_all_ansi_control_sequences():
 
     assert "\x1b[" not in output
     assert "PROTECTED" in output
+
+
+def test_context_list_rich_renders_table_without_authentication():
+    output = _render(render_context_list_rich(_dashboard_snapshot()))
+
+    assert "CONTEXTS" in output
+    assert "DEV" in output
+    assert "company-dev" in output
+    assert "READY TO VERIFY" in output
+    assert "PROTECTED" in output
+    assert "UNBOUND" in output
 
 
 @patch("awsui.profile_selection.select_option")

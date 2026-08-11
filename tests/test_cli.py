@@ -23,6 +23,9 @@ from awsui.init_command import (
     InitResult,
     InitializedEnvironment,
 )
+from awsui.profile_catalog import ProfileCatalogError
+from awsui.project_config import ProjectConfigNotFoundError
+from awsui.tui_context import ContextItem, ContextStatus, DashboardSnapshot
 
 
 def resolved_context(
@@ -77,6 +80,40 @@ def verified_runtime(
             "AWS_DEFAULT_REGION": "ap-northeast-1",
             "SHELL": "/bin/zsh",
         },
+    )
+
+
+def dashboard_snapshot() -> DashboardSnapshot:
+    return DashboardSnapshot(
+        project="payment-service",
+        config_path=Path("/project/.awsui.yaml"),
+        bindings_path=Path("/home/user/.config/awsui/bindings.json"),
+        contexts=(
+            ContextItem(
+                name="dev",
+                expected_account="111111111111",
+                region="us-east-1",
+                protected=False,
+                profile="company-dev",
+                status=ContextStatus.READY,
+            ),
+            ContextItem(
+                name="qa",
+                expected_account="222222222222",
+                region="us-east-1",
+                protected=False,
+                profile="missing-qa",
+                status=ContextStatus.PROFILE_MISSING,
+            ),
+            ContextItem(
+                name="prod",
+                expected_account="999999999999",
+                region="ap-northeast-1",
+                protected=True,
+                profile=None,
+                status=ContextStatus.UNBOUND,
+            ),
+        ),
     )
 
 
@@ -187,6 +224,21 @@ class TestParseArgs:
 
         assert args.command == "context"
         assert args.environment == "prod"
+        assert args.json is True
+
+    @pytest.mark.parametrize("alias", ["ls", "list"])
+    def test_context_list_aliases(self, alias):
+        args = parse_args(["context", alias])
+
+        assert args.command == "context"
+        assert args.environment == alias
+        assert args.json is False
+
+    def test_context_list_json(self):
+        args = parse_args(["context", "ls", "--json"])
+
+        assert args.command == "context"
+        assert args.environment == "ls"
         assert args.json is True
 
     def test_context_requires_environment(self):
@@ -464,6 +516,99 @@ class TestMain:
         assert mock_prepare.call_args.args == (resolved,)
         assert mock_prepare.call_args.kwargs["login_output"] is not None
         mock_run_tui.assert_not_called()
+
+    @patch("awsui.cli.prepare_resolved_runtime")
+    @patch("awsui.cli.load_dashboard")
+    def test_context_list_success(
+        self,
+        mock_load_dashboard,
+        mock_prepare,
+        capsys,
+    ):
+        mock_load_dashboard.return_value = dashboard_snapshot()
+
+        exit_code = main(["context", "ls"])
+
+        assert exit_code == 0
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        assert "Project: payment-service" in captured.out
+        assert "Environment" in captured.out
+        assert "dev" in captured.out
+        assert "PROFILE MISSING" in captured.out
+        assert "PROTECTED" in captured.out
+        assert "UNBOUND" in captured.out
+        mock_load_dashboard.assert_called_once_with()
+        mock_prepare.assert_not_called()
+
+    @patch("awsui.cli.load_dashboard")
+    def test_context_list_json_success(self, mock_load_dashboard, capsys):
+        mock_load_dashboard.return_value = dashboard_snapshot()
+
+        exit_code = main(["context", "list", "--json"])
+
+        assert exit_code == 0
+        captured = capsys.readouterr()
+        assert captured.err == ""
+        payload = json.loads(captured.out)
+        assert list(payload) == ["project", "contexts"]
+        assert payload == {
+            "project": "payment-service",
+            "contexts": [
+                {
+                    "environment": "dev",
+                    "account": "111111111111",
+                    "region": "us-east-1",
+                    "profile": "company-dev",
+                    "status": "ready",
+                    "protected": False,
+                },
+                {
+                    "environment": "qa",
+                    "account": "222222222222",
+                    "region": "us-east-1",
+                    "profile": "missing-qa",
+                    "status": "profile-missing",
+                    "protected": False,
+                },
+                {
+                    "environment": "prod",
+                    "account": "999999999999",
+                    "region": "ap-northeast-1",
+                    "profile": None,
+                    "status": "unbound",
+                    "protected": True,
+                },
+            ],
+        }
+
+    @pytest.mark.parametrize(
+        ("error", "next_step"),
+        [
+            (
+                ProjectConfigNotFoundError(Path("/project"), "file not found"),
+                "awsui init",
+            ),
+            (ProfileCatalogError("profiles unavailable"), "awsui doctor"),
+        ],
+    )
+    @patch("awsui.cli.load_dashboard")
+    def test_context_list_source_errors_return_one(
+        self,
+        mock_load_dashboard,
+        error,
+        next_step,
+        capsys,
+    ):
+        mock_load_dashboard.side_effect = error
+
+        exit_code = main(["context", "ls"])
+
+        assert exit_code == 1
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "awsui context: error:" in captured.err
+        assert next_step in captured.err
 
     @patch("awsui.cli.prepare_resolved_runtime")
     @patch("awsui.cli.resolve_context")

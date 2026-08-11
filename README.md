@@ -224,11 +224,18 @@ You can do everything from the command line too:
 | `awsui` | Open the Context Dashboard |
 | `awsui init` | Initialize verified contexts for a project |
 | `awsui bind <environment>` | Bind an environment to a local AWS profile |
+| `awsui context ls` | List project contexts and local binding status without authenticating |
+| `awsui context ls --json` | Output the local context list as JSON |
 | `awsui context <environment>` | Authenticate, verify, and display a context |
 | `awsui context <environment> --json` | Output the verified context as JSON |
 | `awsui <environment> -- <command> [args...]` | Run a child command after verification |
 | `awsui <environment>` | Open a verified interactive shell |
 | `awsui doctor` | Diagnose local configuration without authenticating |
+
+Use `awsui context ls` (or `awsui context list`) to see the configured account,
+region, protected marker, and local profile status for every context. This is a
+local read-only listing; use `awsui context <environment>` when you want to
+authenticate and verify one context with STS.
 
 The explicit forms remain available:
 

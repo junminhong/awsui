@@ -19,6 +19,7 @@ from .context_verification import (
 )
 from .doctor_command import DoctorReport
 from .init_command import InitResult
+from .tui_context import ContextStatus, DashboardSnapshot
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +139,117 @@ def render_doctor_report_rich(
         ),
         expand=False,
     )
+
+
+_CONTEXT_STATUS_PRESENTATION = {
+    ContextStatus.UNBOUND: ("UNBOUND", "awsui.warning"),
+    ContextStatus.PROFILE_MISSING: ("PROFILE MISSING", "awsui.error"),
+    ContextStatus.READY: ("READY TO VERIFY", "awsui.title"),
+    ContextStatus.VERIFYING: ("VERIFYING", "awsui.title"),
+    ContextStatus.VERIFIED: ("VERIFIED", "awsui.success"),
+    ContextStatus.MISMATCH: ("MISMATCH", "awsui.error"),
+    ContextStatus.ERROR: ("ERROR", "awsui.error"),
+}
+
+
+def render_context_list(snapshot: DashboardSnapshot) -> str:
+    """Render local project contexts as a stable plain-text table."""
+    headers = (
+        "Environment",
+        "Account",
+        "Region",
+        "Profile",
+        "Status",
+        "Protection",
+    )
+    rows = tuple(
+        (
+            context.name,
+            context.expected_account,
+            context.region,
+            context.profile or "—",
+            _context_status_label(context.status),
+            "PROTECTED" if context.protected else "—",
+        )
+        for context in snapshot.contexts
+    )
+    widths = tuple(
+        max(len(header), *(len(row[index]) for row in rows))
+        for index, header in enumerate(headers)
+    )
+
+    def format_row(row: tuple[str, ...]) -> str:
+        return "  ".join(
+            value.ljust(width) for value, width in zip(row, widths, strict=True)
+        ).rstrip()
+
+    lines = [f"Project: {snapshot.project}", "", format_row(headers)]
+    lines.extend(format_row(row) for row in rows)
+    return "\n".join(lines)
+
+
+def render_context_list_rich(snapshot: DashboardSnapshot) -> RenderableType:
+    """Render local project contexts as a Rich table."""
+    table = Table(box=box.SIMPLE, show_edge=False, pad_edge=False)
+    table.add_column("Environment", style="awsui.title", no_wrap=True)
+    table.add_column("Account", style="awsui.value", no_wrap=True)
+    table.add_column("Region", style="awsui.value", no_wrap=True)
+    table.add_column("Profile", style="awsui.value", no_wrap=True)
+    table.add_column("Status", no_wrap=True)
+    table.add_column("Protection", no_wrap=True)
+    for context in snapshot.contexts:
+        status, status_style = _context_status_presentation(context.status)
+        protection = (
+            Text("PROTECTED", style="awsui.protected")
+            if context.protected
+            else Text("—", style="awsui.muted")
+        )
+        table.add_row(
+            safe_text(context.name.upper(), "awsui.title"),
+            safe_text(context.expected_account),
+            safe_text(context.region),
+            safe_text(context.profile or "—"),
+            Text(status, style=status_style),
+            protection,
+        )
+
+    title = Text.assemble(
+        ("awsui", "awsui.title"),
+        (" · ", "awsui.muted"),
+        safe_text(snapshot.project, "awsui.value"),
+        (" / CONTEXTS", "awsui.title"),
+    )
+    return Panel(table, title=title, border_style="cyan", expand=False)
+
+
+def render_context_list_json(snapshot: DashboardSnapshot) -> str:
+    """Render local project contexts as machine-readable JSON."""
+    payload = {
+        "project": snapshot.project,
+        "contexts": [
+            {
+                "environment": context.name,
+                "account": context.expected_account,
+                "region": context.region,
+                "profile": context.profile,
+                "status": context.status.value,
+                "protected": context.protected,
+            }
+            for context in snapshot.contexts
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def _context_status_presentation(status: ContextStatus) -> tuple[str, StyleType]:
+    return _CONTEXT_STATUS_PRESENTATION.get(
+        status,
+        (status.name.replace("_", " "), "awsui.muted"),
+    )
+
+
+def _context_status_label(status: ContextStatus) -> str:
+    return _context_status_presentation(status)[0]
 
 
 def render_bind_result(result: BindResult) -> str:
