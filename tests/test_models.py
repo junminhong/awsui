@@ -12,7 +12,7 @@ def test_profile_sso():
         role="AdministratorAccess",
         region="ap-northeast-1",
         session="corp",
-        source="/path/to/config"
+        source="/path/to/config",
     )
 
     assert profile["name"] == "test-sso"
@@ -32,7 +32,7 @@ def test_profile_assume_role():
         role="MyRole",
         region="us-west-2",
         session=None,
-        source="/path/to/config"
+        source="/path/to/config",
     )
 
     assert profile["name"] == "test-assume"
@@ -51,7 +51,7 @@ def test_profile_basic():
         role=None,
         region=None,
         session=None,
-        source="/path/to/credentials"
+        source="/path/to/credentials",
     )
 
     assert profile["name"] == "default"

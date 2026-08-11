@@ -1,553 +1,443 @@
-"""Tests for app.py business logic."""
+"""Tests for the project-aware Textual Context Dashboard."""
 
-import sys
+import asyncio
+from contextlib import nullcontext
+from io import StringIO
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+from rich.console import Console
 
-from awsui.app import (
-    parse_args,
-    AWSUIApp,
+from awsui.app import AWSUIApp, ContextList, InformationScreen, LaunchScreen
+from awsui.context_engine import ResolvedContext
+from awsui.context_runtime import VerifiedRuntime
+from awsui.context_verification import AccountMismatchError, VerifiedContext
+from awsui.doctor_command import DoctorCheck, DoctorReport
+from awsui.init_screen import InitializationScreen, InitWizardStep
+from awsui.profile_catalog import ProfileCatalog
+from awsui.tui_context import (
+    ContextItem,
+    ContextStatus,
+    DashboardSnapshot,
+    DetectedTool,
 )
-from awsui.models import Profile
 
 
-class TestParseArgs:
-    """Tests for parse_args function."""
-
-    def test_default_arguments(self):
-        """Test parsing with no arguments."""
-        with patch.object(sys, "argv", ["awsui"]):
-            args = parse_args()
-            assert args.profile is None
-            assert args.region is None
-            assert args.lang == "en"
-            assert args.log_level == "INFO"
-
-    def test_profile_argument(self):
-        """Test parsing with profile argument."""
-        with patch.object(sys, "argv", ["awsui", "--profile", "test-profile"]):
-            args = parse_args()
-            assert args.profile == "test-profile"
-
-    def test_region_argument(self):
-        """Test parsing with region argument."""
-        with patch.object(sys, "argv", ["awsui", "--region", "us-west-2"]):
-            args = parse_args()
-            assert args.region == "us-west-2"
-
-    def test_language_argument_english(self):
-        """Test parsing with English language."""
-        with patch.object(sys, "argv", ["awsui", "--lang", "en"]):
-            args = parse_args()
-            assert args.lang == "en"
-
-    def test_language_argument_chinese(self):
-        """Test parsing with Chinese language."""
-        with patch.object(sys, "argv", ["awsui", "--lang", "zh-TW"]):
-            args = parse_args()
-            assert args.lang == "zh-TW"
-
-    def test_log_level_debug(self):
-        """Test parsing with DEBUG log level."""
-        with patch.object(sys, "argv", ["awsui", "--log-level", "DEBUG"]):
-            args = parse_args()
-            assert args.log_level == "DEBUG"
-
-    def test_log_level_warning(self):
-        """Test parsing with WARNING log level."""
-        with patch.object(sys, "argv", ["awsui", "--log-level", "WARNING"]):
-            args = parse_args()
-            assert args.log_level == "WARNING"
-
-    def test_multiple_arguments(self):
-        """Test parsing with multiple arguments."""
-        with patch.object(
-            sys,
-            "argv",
-            [
-                "awsui",
-                "--profile",
+def snapshot(tmp_path: Path) -> DashboardSnapshot:
+    return DashboardSnapshot(
+        project="payment-service",
+        config_path=tmp_path / ".awsui.yaml",
+        bindings_path=tmp_path / "bindings.json",
+        contexts=(
+            ContextItem(
+                "dev",
+                "111111111111",
+                "ap-northeast-1",
+                False,
+                "company-dev",
+                ContextStatus.READY,
+            ),
+            ContextItem(
                 "prod",
-                "--region",
-                "eu-west-1",
-                "--lang",
-                "zh-TW",
-                "--log-level",
-                "ERROR",
-            ],
+                "999999999999",
+                "ap-northeast-1",
+                True,
+                None,
+                ContextStatus.UNBOUND,
+            ),
+        ),
+    )
+
+
+def runtime(tmp_path: Path) -> VerifiedRuntime:
+    resolved = ResolvedContext(
+        project="payment-service",
+        environment="dev",
+        expected_account="111111111111",
+        region="ap-northeast-1",
+        profile="company-dev",
+        protected=False,
+        project_config_path=tmp_path / ".awsui.yaml",
+        bindings_path=tmp_path / "bindings.json",
+    )
+    return VerifiedRuntime(
+        verified=VerifiedContext(
+            resolved,
+            "111111111111",
+            "arn:aws:sts::111111111111:assumed-role/Developer/session",
+        ),
+        environment={
+            "AWS_PROFILE": "company-dev",
+            "AWS_REGION": "ap-northeast-1",
+            "AWS_DEFAULT_REGION": "ap-northeast-1",
+            "SHELL": "/bin/zsh",
+        },
+    )
+
+
+def run(coroutine):
+    return asyncio.run(coroutine)
+
+
+def test_no_project_renders_onboarding(tmp_path):
+    async def scenario():
+        with patch("awsui.app.get_logger"):
+            app = AWSUIApp(start_dir=tmp_path, base_environment={})
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert app.snapshot is None
+            assert app.sub_title == "No project"
+            assert app.query_one("#initialize").display is True
+            assert app.query_one("#verify").display is False
+
+    run(scenario())
+
+
+@pytest.mark.parametrize(
+    ("size", "lang"),
+    [((80, 24), "en"), ((120, 36), "zh-TW")],
+)
+def test_initialize_opens_native_textual_wizard(tmp_path, size, lang):
+    async def scenario():
+        with patch("awsui.app.get_logger"):
+            app = AWSUIApp(lang=lang, start_dir=tmp_path, base_environment={})
+        app.suspend = Mock(return_value=nullcontext())
+        with patch(
+            "awsui.init_screen.load_profile_catalog",
+            return_value=ProfileCatalog.from_profiles(()),
         ):
-            args = parse_args()
-            assert args.profile == "prod"
-            assert args.region == "eu-west-1"
-            assert args.lang == "zh-TW"
-            assert args.log_level == "ERROR"
+            async with app.run_test(size=size) as pilot:
+                await pilot.pause()
+                app.action_initialize()
+                await pilot.pause()
+                assert isinstance(app.screen, InitializationScreen)
+                assert app.screen.query_one("#init-project-name").value == tmp_path.name
+                app.suspend.assert_not_called()
+
+    run(scenario())
 
 
-class TestProfileListFiltering:
-    """Tests for ProfileList filtering logic (without UI dependencies)."""
+def test_native_init_creates_verified_dev_and_qa_contexts(tmp_path):
+    async def scenario():
+        local_profile = {
+            "name": "company-developer",
+            "kind": "sso",
+            "account": None,
+            "role": None,
+            "region": "ap-northeast-1",
+            "session": "company",
+            "source": str(tmp_path / "config"),
+        }
+        with patch("awsui.app.get_logger"):
+            app = AWSUIApp(start_dir=tmp_path, base_environment={})
+        screen = InitializationScreen(
+            start_dir=tmp_path,
+            bindings_path=tmp_path / "bindings.json",
+            base_environment={"AWS_ACCESS_KEY_ID": "must-not-leak"},
+            translations=app.lang,
+            identity_provider=lambda _profile: {
+                "Account": "111111111111",
+                "Arn": "arn:aws:sts::111111111111:assumed-role/Developer/test",
+            },
+            profiles_loader=lambda: [local_profile],
+            cli_info_provider=lambda: None,
+        )
+        async with app.run_test(size=(100, 34)) as pilot:
+            app.push_screen(screen)
+            await pilot.pause()
+            screen.query_one("#init-project-name").value = "payment-service"
+            screen._continue_project()
 
-    @pytest.fixture
-    def sample_profiles(self):
-        """Create sample profiles for testing."""
-        return [
-            Profile(
-                name="prod-admin",
-                kind="sso",
-                account="111111111111",
-                role="AdministratorAccess",
-                region="us-east-1",
-                session="company",
-                source="/home/user/.aws/config",
-            ),
-            Profile(
-                name="staging-dev",
-                kind="sso",
-                account="222222222222",
-                role="DeveloperAccess",
-                region="us-west-2",
-                session="company",
-                source="/home/user/.aws/config",
-            ),
-            Profile(
-                name="test-assume",
-                kind="assume",
-                account="333333333333",
-                role="TestRole",
-                region="eu-west-1",
-                session=None,
-                source="/home/user/.aws/config",
-            ),
-        ]
+            for environment in ("dev", "qa"):
+                screen.query_one("#init-environment-name").value = environment
+                screen._start_verification()
+                worker = screen.verification_worker
+                assert worker is not None
+                await worker.wait()
+                await pilot.pause()
+                assert screen.step is InitWizardStep.REVIEW
+                if environment == "dev":
+                    screen._add_environment()
 
-    def test_filter_logic_by_name(self, sample_profiles):
-        """Test filtering logic for profile names."""
-        query = "prod"
-        query_lower = query.lower()
+            assert [item.name for item in screen.environments] == ["dev", "qa"]
+            screen._finish()
+            await pilot.pause()
 
-        filtered = [
-            p for p in sample_profiles
-            if query_lower in p["name"].lower()
-            or (p["account"] and query_lower in p["account"])
-            or (p["role"] and query_lower in p["role"].lower())
-            or (p["region"] and query_lower in p["region"].lower())
-        ]
+        config = (tmp_path / ".awsui.yaml").read_text(encoding="utf-8")
+        bindings = (tmp_path / "bindings.json").read_text(encoding="utf-8")
+        assert "dev:" in config
+        assert "qa:" in config
+        assert "company-developer" not in config
+        assert "company-developer" in bindings
 
-        assert len(filtered) == 1
-        assert filtered[0]["name"] == "prod-admin"
+    run(scenario())
 
-    def test_filter_logic_by_account(self, sample_profiles):
-        """Test filtering logic for account ID."""
-        query = "222222"
-        query_lower = query.lower()
 
-        filtered = [
-            p for p in sample_profiles
-            if query_lower in p["name"].lower()
-            or (p["account"] and query_lower in p["account"])
-            or (p["role"] and query_lower in p["role"].lower())
-            or (p["region"] and query_lower in p["region"].lower())
-        ]
+def test_native_init_returns_after_official_profile_creation(tmp_path):
+    async def scenario():
+        created_profile = {
+            "name": "payment-service-dev",
+            "kind": "sso",
+            "account": None,
+            "role": None,
+            "region": "ap-northeast-1",
+            "session": "company",
+            "source": str(tmp_path / "config"),
+        }
+        state = {"created": False}
+        commands = []
 
-        assert len(filtered) == 1
-        assert filtered[0]["name"] == "staging-dev"
+        def profiles_loader():
+            return [created_profile] if state["created"] else []
 
-    def test_filter_logic_by_role(self, sample_profiles):
-        """Test filtering logic for role name."""
-        query = "developer"
-        query_lower = query.lower()
+        def command_runner(command, **_kwargs):
+            commands.append(command)
+            state["created"] = True
+            return 0
 
-        filtered = [
-            p for p in sample_profiles
-            if query_lower in p["name"].lower()
-            or (p["account"] and query_lower in p["account"])
-            or (p["role"] and query_lower in p["role"].lower())
-            or (p["region"] and query_lower in p["region"].lower())
-        ]
+        with patch("awsui.app.get_logger"):
+            app = AWSUIApp(start_dir=tmp_path, base_environment={})
+        app.suspend = Mock(return_value=nullcontext())
+        screen = InitializationScreen(
+            start_dir=tmp_path,
+            bindings_path=tmp_path / "bindings.json",
+            base_environment={},
+            translations=app.lang,
+            profiles_loader=profiles_loader,
+            command_runner=command_runner,
+            cli_info_provider=lambda: None,
+        )
+        async with app.run_test(size=(100, 34)) as pilot:
+            app.push_screen(screen)
+            await pilot.pause()
+            screen.query_one("#init-project-name").value = "payment-service"
+            screen._continue_project()
+            screen.query_one("#init-environment-name").value = "dev"
+            screen._open_profile_creation()
+            method_list = screen.query_one("#init-method-list")
+            assert method_list.get_option_at_index(0).id == "sso"
+            with patch("awsui.init_screen.sys.stdout", new=StringIO()):
+                screen._start_profile_creation()
+            await pilot.pause()
 
-        assert len(filtered) == 1
-        assert filtered[0]["role"] == "DeveloperAccess"
-
-    def test_filter_logic_by_region(self, sample_profiles):
-        """Test filtering logic for region."""
-        query = "eu-west"
-        query_lower = query.lower()
-
-        filtered = [
-            p for p in sample_profiles
-            if query_lower in p["name"].lower()
-            or (p["account"] and query_lower in p["account"])
-            or (p["role"] and query_lower in p["role"].lower())
-            or (p["region"] and query_lower in p["region"].lower())
-        ]
-
-        assert len(filtered) == 1
-        assert filtered[0]["region"] == "eu-west-1"
-
-    def test_filter_logic_case_insensitive(self, sample_profiles):
-        """Test that filtering logic is case insensitive."""
-        query = "PROD"
-        query_lower = query.lower()
-
-        filtered = [
-            p for p in sample_profiles
-            if query_lower in p["name"].lower()
-            or (p["account"] and query_lower in p["account"])
-            or (p["role"] and query_lower in p["role"].lower())
-            or (p["region"] and query_lower in p["region"].lower())
-        ]
-
-        assert len(filtered) == 1
-        assert filtered[0]["name"] == "prod-admin"
-
-    def test_filter_logic_empty_query(self, sample_profiles):
-        """Test filtering logic with empty query."""
-        query = ""
-
-        if not query:
-            filtered = sample_profiles.copy()
-        else:
-            query_lower = query.lower()
-            filtered = [
-                p for p in sample_profiles
-                if query_lower in p["name"].lower()
-                or (p["account"] and query_lower in p["account"])
-                or (p["role"] and query_lower in p["role"].lower())
-                or (p["region"] and query_lower in p["region"].lower())
+            assert screen.step is InitWizardStep.CONTEXT
+            assert screen.selected_profile == "payment-service-dev"
+            assert screen.query_one("#init-region").value == "ap-northeast-1"
+            assert commands == [
+                [
+                    "aws",
+                    "configure",
+                    "sso",
+                    "--profile",
+                    "payment-service-dev",
+                ]
             ]
+            app.suspend.assert_called_once()
 
-        assert len(filtered) == 3
-        assert filtered == sample_profiles
-
-    def test_filter_logic_no_matches(self, sample_profiles):
-        """Test filtering logic with no matches."""
-        query = "nonexistent"
-        query_lower = query.lower()
-
-        filtered = [
-            p for p in sample_profiles
-            if query_lower in p["name"].lower()
-            or (p["account"] and query_lower in p["account"])
-            or (p["role"] and query_lower in p["role"].lower())
-            or (p["region"] and query_lower in p["region"].lower())
-        ]
-
-        assert len(filtered) == 0
-
-    def test_filter_logic_matches_multiple_fields(self, sample_profiles):
-        """Test filtering logic that matches in multiple fields."""
-        query = "admin"
-        query_lower = query.lower()
-
-        filtered = [
-            p for p in sample_profiles
-            if query_lower in p["name"].lower()
-            or (p["account"] and query_lower in p["account"])
-            or (p["role"] and query_lower in p["role"].lower())
-            or (p["region"] and query_lower in p["region"].lower())
-        ]
-
-        # Query "admin" should match both profile name and role containing "admin"
-        assert len(filtered) == 1
-        assert "admin" in filtered[0]["name"].lower()
+    run(scenario())
 
 
-class TestAWSUIAppInitialization:
-    """Tests for AWSUIApp initialization."""
-
-    def test_default_initialization(self):
-        """Test app initialization with default parameters."""
-        with patch("awsui.app.get_logger"):
-            app = AWSUIApp()
-            assert app.preselect_profile is None
-            assert app.override_region is None
-            assert app.profiles == []
-            assert app.selected_profile is None
-            assert app.q_available is False
-            assert app.command_history == []
-            assert app.history_index == -1
-
-    def test_initialization_with_profile(self):
-        """Test app initialization with profile parameter."""
-        with patch("awsui.app.get_logger"):
-            app = AWSUIApp(profile="test-profile")
-            assert app.preselect_profile == "test-profile"
-
-    def test_initialization_with_region(self):
-        """Test app initialization with region parameter."""
-        with patch("awsui.app.get_logger"):
-            app = AWSUIApp(region="ap-southeast-1")
-            assert app.override_region == "ap-southeast-1"
-
-    def test_initialization_with_language_english(self):
-        """Test app initialization with English language."""
-        with patch("awsui.app.get_logger"):
-            app = AWSUIApp(lang="en")
-            from awsui.i18n import LANG_EN
-
-            assert app.lang == LANG_EN
-
-    def test_initialization_with_language_chinese(self):
-        """Test app initialization with Chinese language."""
-        with patch("awsui.app.get_logger"):
-            app = AWSUIApp(lang="zh-TW")
-            from awsui.i18n import LANG_ZH_TW
-
-            assert app.lang == LANG_ZH_TW
-
-    def test_initialization_with_log_level(self):
-        """Test app initialization with custom log level."""
-        with patch("awsui.app.get_logger") as mock_logger:
-            AWSUIApp(log_level="DEBUG")
-            mock_logger.assert_called_once_with("DEBUG")
-
-    def test_initialization_sets_subtitle(self):
-        """Test that app subtitle is set from language."""
-        with patch("awsui.app.get_logger"):
-            app = AWSUIApp(lang="en")
-            assert app.sub_title == app.lang["app_subtitle"]
-
-
-class TestAWSUIAppHelperMethods:
-    """Tests for AWSUIApp helper methods."""
-
-    @pytest.fixture
-    def app(self):
-        """Create app instance for testing."""
-        with patch("awsui.app.get_logger"):
-            return AWSUIApp()
-
-    def test_build_profile_detail(self, app):
-        """Test building profile detail table."""
-        profile = Profile(
-            name="test-profile",
-            kind="sso",
-            account="123456789012",
-            role="AdminRole",
-            region="us-east-1",
-            session="test-session",
-            source="/home/user/.aws/config",
-        )
-
-        table = app.build_profile_detail(profile)
-
-        # Verify that a Rich Table object is created for displaying profile details
-        assert table is not None
-
-    def test_build_profile_detail_with_region_override(self, app):
-        """Test building profile detail with region override."""
-        app.override_region = "eu-west-1"
-        profile = Profile(
-            name="test-profile",
-            kind="sso",
-            account="123456789012",
-            role="AdminRole",
-            region="us-east-1",
-            session="test-session",
-            source="/home/user/.aws/config",
-        )
-
-        table = app.build_profile_detail(profile)
-        # Verify table is created with region override applied
-        assert table is not None
-
-    def test_build_identity_detail(self, app):
-        """Test building identity detail table."""
-        identity = {
-            "Account": "123456789012",
-            "Arn": "arn:aws:iam::123456789012:user/test-user",
-            "UserId": "AIDACKCEVSQ6C2EXAMPLE",
+def test_native_init_cancel_discards_verified_draft(tmp_path):
+    async def scenario():
+        local_profile = {
+            "name": "company-dev",
+            "kind": "sso",
+            "account": None,
+            "role": None,
+            "region": "ap-northeast-1",
+            "session": "company",
+            "source": str(tmp_path / "config"),
         }
-
-        table = app.build_identity_detail(identity)
-        assert table is not None
-
-    def test_build_identity_detail_with_missing_fields(self, app):
-        """Test building identity detail with missing fields."""
-        identity = {
-            "Account": "123456789012",
-        }
-
-        table = app.build_identity_detail(identity)
-        assert table is not None
-
-
-class TestNavigateHistory:
-    """Tests for command history navigation."""
-
-    @pytest.fixture
-    def app(self):
-        """Create app with command history."""
         with patch("awsui.app.get_logger"):
-            app = AWSUIApp()
-            app.command_history = ["aws s3 ls", "aws ec2 describe-instances", "aws iam list-users"]
-            return app
+            app = AWSUIApp(start_dir=tmp_path, base_environment={})
+        screen = InitializationScreen(
+            start_dir=tmp_path,
+            bindings_path=tmp_path / "bindings.json",
+            base_environment={},
+            translations=app.lang,
+            identity_provider=lambda _profile: {"Account": "111111111111"},
+            profiles_loader=lambda: [local_profile],
+            cli_info_provider=lambda: None,
+        )
+        async with app.run_test(size=(80, 24)) as pilot:
+            app.push_screen(screen)
+            await pilot.pause()
+            screen._continue_project()
+            screen.query_one("#init-environment-name").value = "dev"
+            screen._start_verification()
+            worker = screen.verification_worker
+            assert worker is not None
+            await worker.wait()
+            await pilot.pause()
 
-    def test_navigate_history_up_from_initial(self, app):
-        """Test navigating up from initial state."""
-        mock_input = Mock()
-        mock_input.value = ""
+            screen.action_cancel()
+            assert app.screen is screen
+            assert screen.discard_armed is True
+            screen.action_cancel()
+            await pilot.pause()
 
-        with patch.object(app, "query_one", return_value=Mock()):
-            app.navigate_history_up(mock_input)
+        assert not (tmp_path / ".awsui.yaml").exists()
+        assert not (tmp_path / "bindings.json").exists()
 
-        # Index should point to the last (most recent) command
-        assert app.history_index == 2
-        assert mock_input.value == "aws iam list-users"
-        assert app.browsing_history is True
+    run(scenario())
 
-    def test_navigate_history_up_multiple_times(self, app):
-        """Test navigating up multiple times."""
-        mock_input = Mock()
-        mock_input.value = ""
 
-        with patch.object(app, "query_one", return_value=Mock()):
-            app.navigate_history_up(mock_input)
-            assert app.history_index == 2
-
-            app.navigate_history_up(mock_input)
-            assert app.history_index == 1
-            assert mock_input.value == "aws ec2 describe-instances"
-
-            app.navigate_history_up(mock_input)
-            assert app.history_index == 0
-            assert mock_input.value == "aws s3 ls"
-
-    def test_navigate_history_up_at_boundary(self, app):
-        """Test navigating up at the top of history."""
-        mock_input = Mock()
-        mock_input.value = ""
-        app.history_index = 0
-
-        with patch.object(app, "query_one", return_value=Mock()):
-            app.navigate_history_up(mock_input)
-
-        # Should remain at index 0 (oldest command) without going negative
-        assert app.history_index == 0
-
-    def test_navigate_history_down(self, app):
-        """Test navigating down in history."""
-        mock_input = Mock()
-        mock_input.value = ""
-        app.history_index = 1
-        app.browsing_history = True
-
-        with patch.object(app, "query_one", return_value=Mock()):
-            app.navigate_history_down(mock_input)
-
-        assert app.history_index == 2
-        assert mock_input.value == "aws iam list-users"
-
-    def test_navigate_history_down_to_original(self, app):
-        """Test navigating down returns to original input."""
-        mock_input = Mock()
-        mock_input.value = ""
-        app.history_index = 2
-        app.current_input = "test input"
-        app.browsing_history = True
-
-        with patch.object(app, "query_one", return_value=Mock()):
-            app.navigate_history_down(mock_input)
-
-        assert app.history_index == -1
-        assert mock_input.value == "test input"
-        assert app.browsing_history is False
-
-    def test_navigate_history_down_not_browsing(self, app):
-        """Test navigating down when not in browsing mode."""
-        mock_input = Mock()
-        app.history_index = -1
-
-        with patch.object(app, "query_one", return_value=Mock()):
-            app.navigate_history_down(mock_input)
-
-        # Should remain at -1 (not browsing) and take no action
-        assert app.history_index == -1
-
-    def test_empty_history(self):
-        """Test navigation with empty history."""
+def test_dashboard_renders_contexts_and_keyboard_navigation(tmp_path):
+    async def scenario():
         with patch("awsui.app.get_logger"):
-            app = AWSUIApp()
-            app.command_history = []
+            app = AWSUIApp(start_dir=tmp_path, base_environment={})
+        with patch("awsui.app.load_dashboard", return_value=snapshot(tmp_path)):
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                assert app.sub_title == "payment-service"
+                assert app.theme == "awsui-graphite"
+                assert len(app.query_one("#context-list", ContextList).children) == 2
+                assert app.selected_environment == "dev"
+                await pilot.press("down")
+                assert app.selected_environment == "prod"
+                assert app.query_one("#verify").display is False
+                app._refresh_context_list()
+                await pilot.pause()
+                assert app.query_one("#context-list", ContextList).index == 1
+                assert app.selected_environment == "prod"
 
-        mock_input = Mock()
-        mock_input.value = ""
-
-        with patch.object(app, "query_one", return_value=Mock()):
-            app.navigate_history_up(mock_input)
-
-        # Should remain at -1 when history is empty
-        assert app.history_index == -1
+    run(scenario())
 
 
-class TestCommandHistoryManagement:
-    """Tests for command history management."""
-
-    def test_history_saves_current_input(self):
-        """Test that current input is saved when starting to browse."""
+def test_doctor_modal_mounts_with_textual_safe_rich_styles(tmp_path):
+    async def scenario():
+        report = DoctorReport(
+            checks=(
+                DoctorCheck("AWS CLI v2", True, "available"),
+                DoctorCheck(
+                    "Context prod",
+                    False,
+                    "not bound",
+                    "Run `awsui bind prod`.",
+                ),
+            )
+        )
         with patch("awsui.app.get_logger"):
-            app = AWSUIApp()
-            app.command_history = ["cmd1", "cmd2"]
+            app = AWSUIApp(start_dir=tmp_path, base_environment={})
+        with (
+            patch("awsui.app.load_dashboard", return_value=snapshot(tmp_path)),
+            patch("awsui.app.diagnose", return_value=report),
+        ):
+            async with app.run_test() as pilot:
+                await pilot.click("#doctor")
+                await pilot.pause()
+                assert isinstance(app.screen, InformationScreen)
+                assert app.screen.modal_title == "Doctor"
+                console = Console(file=StringIO(), record=True, width=100)
+                console.print(app.screen.renderable)
+                assert "Next steps" in console.export_text()
 
-        mock_input = Mock()
-        mock_input.value = "current typing"
+    run(scenario())
 
-        with patch.object(app, "query_one", return_value=Mock()):
-            app.navigate_history_up(mock_input)
 
-        assert app.current_input == "current typing"
-
-    def test_browsing_flag_set(self):
-        """Test that browsing flag is set correctly."""
+def test_verify_success_updates_session_identity(tmp_path):
+    async def scenario():
+        verified_runtime = runtime(tmp_path)
         with patch("awsui.app.get_logger"):
-            app = AWSUIApp()
-            app.command_history = ["cmd1"]
+            app = AWSUIApp(start_dir=tmp_path, base_environment={"PATH": "/bin"})
+        app.suspend = Mock(return_value=nullcontext())
+        with (
+            patch("awsui.app.load_dashboard", return_value=snapshot(tmp_path)),
+            patch(
+                "awsui.app.prepare_context_runtime", return_value=verified_runtime
+            ) as mock_prepare,
+        ):
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                await pilot.press("v")
+                await pilot.pause()
+                assert app.statuses["dev"] is ContextStatus.VERIFIED
+                assert app.verified["dev"].actual_account == "111111111111"
+                mock_prepare.assert_called_once()
 
-        mock_input = Mock()
-        mock_input.value = ""
-
-        assert app.browsing_history is False
-
-        with patch.object(app, "query_one", return_value=Mock()):
-            app.navigate_history_up(mock_input)
-
-        assert app.browsing_history is True
+    run(scenario())
 
 
-class TestBuildHelperMethods:
-    """Additional tests for helper methods."""
-
-    def test_show_empty_state(self):
-        """Test show_empty_state method."""
+def test_mismatch_blocks_child_launch(tmp_path):
+    async def scenario():
+        mismatch = AccountMismatchError(
+            project="payment-service",
+            environment="dev",
+            profile="company-dev",
+            expected_account="111111111111",
+            actual_account="999999999999",
+        )
         with patch("awsui.app.get_logger"):
-            app = AWSUIApp()
+            app = AWSUIApp(start_dir=tmp_path, base_environment={})
+        app.suspend = Mock(return_value=nullcontext())
+        with (
+            patch("awsui.app.load_dashboard", return_value=snapshot(tmp_path)),
+            patch("awsui.app.prepare_context_runtime", side_effect=mismatch),
+            patch("awsui.app.run_command") as mock_run,
+        ):
+            async with app.run_test() as pilot:
+                await pilot.pause()
+                app._launch_result("codex")
+                await pilot.pause()
+                assert app.statuses["dev"] is ContextStatus.MISMATCH
+                assert app.actual_accounts["dev"] == "999999999999"
+                mock_run.assert_not_called()
 
-        mock_detail = Mock()
-        with patch.object(app, "query_one", return_value=mock_detail):
-            app.show_empty_state("Test Title", "Test Hint")
+    run(scenario())
 
-        mock_detail.update.assert_called_once()
-        mock_detail.add_class.assert_called_once_with("empty-state")
 
-    def test_update_status_info(self):
-        """Test update_status with info message."""
+def test_launch_screen_prefills_first_detected_tool():
+    screen = LaunchScreen(
+        "dev",
+        (DetectedTool("Codex", "codex", "/tools/codex"),),
+        protected=False,
+    )
+
+    assert screen.tools[0].executable == "codex"
+
+
+def test_launch_screen_mounts_with_only_custom_command(tmp_path):
+    async def scenario():
         with patch("awsui.app.get_logger"):
-            app = AWSUIApp()
+            app = AWSUIApp(start_dir=tmp_path, base_environment={})
+        with patch("awsui.app.load_dashboard", return_value=snapshot(tmp_path)):
+            async with app.run_test() as pilot:
+                app.push_screen(LaunchScreen("dev", (), protected=False))
+                await pilot.pause()
+                screen = app.screen
+                assert isinstance(screen, LaunchScreen)
+                assert screen.query_one("#launch-command").value == ""
+                assert screen.query_one("#launch-confirm").label.plain == (
+                    "Verify & Launch"
+                )
 
-        with patch.object(app, "notify") as mock_notify:
-            app.update_status("Test message", error=False)
+    run(scenario())
 
-        mock_notify.assert_called_once_with("Test message", severity="information")
 
-    def test_update_status_error(self):
-        """Test update_status with error message."""
+@pytest.mark.parametrize(
+    ("size", "lang", "expected_help_title"),
+    [
+        ((80, 24), "en", "Keyboard shortcuts"),
+        ((120, 36), "zh-TW", "鍵盤快捷鍵"),
+    ],
+)
+def test_dashboard_and_help_mount_at_supported_viewports(
+    tmp_path,
+    size,
+    lang,
+    expected_help_title,
+):
+    async def scenario():
         with patch("awsui.app.get_logger"):
-            app = AWSUIApp()
+            app = AWSUIApp(lang=lang, start_dir=tmp_path, base_environment={})
+        with patch("awsui.app.load_dashboard", return_value=snapshot(tmp_path)):
+            async with app.run_test(size=size) as pilot:
+                await pilot.pause()
+                assert app.query_one("#action-bar").display is True
+                app.action_show_help()
+                await pilot.pause()
+                assert isinstance(app.screen, InformationScreen)
+                assert app.screen.modal_title == expected_help_title
 
-        with patch.object(app, "notify") as mock_notify:
-            app.update_status("Error message", error=True)
-
-        mock_notify.assert_called_once()
-        call_args = mock_notify.call_args
-        assert call_args[0][0] == "Error message"
-        assert call_args[1]["severity"] == "error"
+    run(scenario())

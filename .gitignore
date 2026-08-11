@@ -13,7 +13,13 @@ env/
 
 # Testing
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.hypothesis/
 .coverage
+.coverage.*
+coverage.xml
 htmlcov/
 *.cover
 
@@ -31,5 +37,18 @@ Thumbs.db
 # Logs
 *.log
 
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
 # AWS (optional - for testing)
 .aws/
+
+# Internal planning documents
+docs/prd/
+
+# Local, snapshot-locked commit helpers
+scripts/
+
+.awsui.yaml

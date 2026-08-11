@@ -3,7 +3,11 @@
 import sys
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 class StructuredLogger:
@@ -25,7 +29,7 @@ class StructuredLogger:
     def _log(self, level: str, action: str, **kwargs):
         """Internal log method."""
         record = {
-            "ts": datetime.utcnow().isoformat() + "Z",
+            "ts": _utc_timestamp(),
             "level": level,
             "action": action,
         }
@@ -62,7 +66,7 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         log_data = {
-            "ts": datetime.utcnow().isoformat() + "Z",
+            "ts": _utc_timestamp(),
             "level": record.levelname,
             "action": record.getMessage(),
         }
