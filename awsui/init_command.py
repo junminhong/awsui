@@ -19,6 +19,7 @@ from .context_verification import (
 )
 from .models import Profile
 from .interactive import InputClosedError, prompt_value, prompt_yes_no, read_line
+from .i18n import text
 from .profile_creation import ProfileCommandRunner
 from .profile_selection import (
     ProfileSelectionCancelled,
@@ -70,7 +71,7 @@ def initialize_project(
 
     output.print(
         Panel(
-            Text("Create verified AWS contexts for this project.", style="awsui.muted"),
+            Text(text("cli_init_intro"), style="awsui.muted"),
             title=Text("awsui init", style="awsui.title"),
             border_style="cyan",
             expand=False,
@@ -80,7 +81,7 @@ def initialize_project(
     default_project = target.default_project
     try:
         project = prompt_value(
-            f"Project name [{default_project}]: ",
+            text("cli_project_prompt", default=default_project),
             default=default_project,
             stdin=input_stream,
             stdout=output_stream,
@@ -92,9 +93,9 @@ def initialize_project(
     names: set[str] = set()
     while True:
         prompt = (
-            "Environment name: "
+            text("cli_environment_prompt")
             if not initialized
-            else "Environment name (Enter to finish): "
+            else text("cli_environment_finish_prompt")
         )
         try:
             environment_name = read_line(
@@ -110,12 +111,14 @@ def initialize_project(
             if initialized:
                 break
             output.print(
-                Text("At least one environment is required.", style="awsui.warning"),
-                plain="At least one environment is required.",
+                Text(text("cli_environment_required"), style="awsui.warning"),
+                plain=text("cli_environment_required"),
             )
             continue
         if environment_name in names:
-            message = f"Environment {environment_name!r} was already added."
+            message = text(
+                "cli_environment_duplicate", environment=environment_name
+            )
             output.print(
                 safe_text(message, "awsui.warning"),
                 plain=message,
@@ -125,7 +128,7 @@ def initialize_project(
         output.print(
             Rule(
                 Text.assemble(
-                    ("Environment ", "awsui.label"),
+                    (f"{text('cli_environment')} ", "awsui.label"),
                     safe_text(environment_name.upper(), "awsui.title"),
                 ),
                 align="left",
@@ -157,7 +160,9 @@ def initialize_project(
             or base.get("AWS_DEFAULT_REGION")
         )
         region_prompt = (
-            "Region: " if default_region is None else f"Region [{default_region}]: "
+            text("cli_region_prompt")
+            if default_region is None
+            else text("cli_region_default_prompt", default=default_region)
         )
         try:
             region = prompt_value(
@@ -167,7 +172,7 @@ def initialize_project(
                 stdout=output_stream,
             )
             protected = prompt_yes_no(
-                "Mark as protected? [y/N]: ",
+                text("cli_protected_prompt"),
                 stdin=input_stream,
                 stdout=output_stream,
             )
@@ -176,7 +181,7 @@ def initialize_project(
                 "initialization cancelled: input closed"
             ) from exc
 
-        status = "Authenticating and verifying AWS identity..."
+        status = text("cli_authenticating")
         errors.print(
             Text.assemble(("● ", "awsui.title"), safe_text(status, "awsui.muted")),
             plain=status,
@@ -199,22 +204,31 @@ def initialize_project(
             grid = Table.grid(padding=(0, 2))
             grid.add_column(style="awsui.label", no_wrap=True)
             grid.add_column(style="awsui.value")
-            grid.add_row("Account", safe_text(verified_environment.account))
-            grid.add_row("Region", safe_text(region))
-            grid.add_row("Profile", safe_text(profile_name))
+            grid.add_row(text("cli_account"), safe_text(verified_environment.account))
+            grid.add_row(text("cli_region"), safe_text(region))
+            grid.add_row(text("cli_profile"), safe_text(profile_name))
             if protected:
-                grid.add_row("Protection", Text("PROTECTED", style="awsui.protected"))
+                grid.add_row(
+                    text("cli_protection"),
+                    Text(text("cli_protected"), style="awsui.protected"),
+                )
             output.print(
                 Panel(
                     grid,
-                    title=Text("✓ Identity verified", style="awsui.success"),
+                    title=Text(
+                        f"✓ {text('cli_identity_verified_short')}",
+                        style="awsui.success",
+                    ),
                     border_style="red" if protected else "green",
                     expand=False,
                 )
             )
         else:
-            print(f"Account: {verified_environment.account}", file=output_stream)
-            print(f"Region: {region}", file=output_stream)
+            print(
+                f"{text('cli_account')}: {verified_environment.account}",
+                file=output_stream,
+            )
+            print(f"{text('cli_region')}: {region}", file=output_stream)
             print("", file=output_stream)
         initialized.append(verified_environment)
         names.add(environment_name)

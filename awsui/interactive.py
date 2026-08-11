@@ -3,6 +3,7 @@
 from typing import TextIO
 
 from .cli_console import CliConsole
+from .i18n import text
 
 
 class InputClosedError(Exception):
@@ -32,8 +33,8 @@ def prompt_value(
         if default:
             return default
         output.print(
-            "A non-empty value is required.",
-            plain="A non-empty value is required.",
+            text("cli_nonempty_required"),
+            plain=text("cli_nonempty_required"),
         )
 
 
@@ -49,8 +50,8 @@ def prompt_yes_no(
         value = read_line(prompt, stdin=stdin, stdout=stdout).strip().casefold()
         if not value:
             return default
-        if value in {"y", "yes"}:
+        if value.casefold() in {"y", "yes", "是"}:
             return True
-        if value in {"n", "no"}:
+        if value.casefold() in {"n", "no", "否"}:
             return False
-        output.print("Enter y or n.", plain="Enter y or n.")
+        output.print(text("cli_yes_no_required"), plain=text("cli_yes_no_required"))

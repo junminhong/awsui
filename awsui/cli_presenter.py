@@ -18,6 +18,7 @@ from .context_verification import (
     describe_principal,
 )
 from .doctor_command import DoctorReport
+from .i18n import text
 from .init_command import InitResult
 from .tui_context import ContextStatus, DashboardSnapshot
 
@@ -37,9 +38,12 @@ class DoctorRenderStyles:
 
 
 def render_init_result(result: InitResult) -> str:
-    lines = [f"Created {result.config_path}", f"Project: {result.project}"]
+    lines = [
+        text("cli_created", path=result.config_path),
+        f"{text('cli_project')}: {result.project}",
+    ]
     for environment in result.environments:
-        protection = " · PROTECTED" if environment.protected else ""
+        protection = f" · {text('cli_protected')}" if environment.protected else ""
         lines.append(
             f"  {environment.name}: {environment.account} · "
             f"{environment.region}{protection}"
@@ -50,13 +54,13 @@ def render_init_result(result: InitResult) -> str:
 def render_init_result_rich(result: InitResult) -> RenderableType:
     """Render a structured project initialization summary."""
     table = Table(box=box.SIMPLE, show_edge=False, pad_edge=False)
-    table.add_column("Environment", style="awsui.title")
-    table.add_column("Account", style="awsui.value")
-    table.add_column("Region", style="awsui.value")
-    table.add_column("Protection")
+    table.add_column(text("cli_environment"), style="awsui.title")
+    table.add_column(text("cli_account"), style="awsui.value")
+    table.add_column(text("cli_region"), style="awsui.value")
+    table.add_column(text("cli_protection"))
     for environment in result.environments:
         protection = (
-            Text("PROTECTED", style="awsui.protected")
+            Text(text("cli_protected"), style="awsui.protected")
             if environment.protected
             else Text("—", style="awsui.muted")
         )
@@ -67,15 +71,15 @@ def render_init_result_rich(result: InitResult) -> RenderableType:
             protection,
         )
     details = Text.assemble(
-        ("Project  ", "awsui.label"),
+        (f"{text('cli_project')}  ", "awsui.label"),
         safe_text(result.project, "awsui.value"),
         "\n",
-        ("Config   ", "awsui.label"),
+        (f"{text('cli_config')}   ", "awsui.label"),
         safe_text(result.config_path, "awsui.value"),
     )
     return Panel(
         Group(details, Text(), table),
-        title=Text("✓ Project initialized", style="awsui.success"),
+        title=Text(f"✓ {text('cli_initialized')}", style="awsui.success"),
         border_style="cyan",
         expand=False,
     )
@@ -87,7 +91,7 @@ def render_doctor_report(report: DoctorReport) -> str:
         for check in report.checks
     ]
     if report.remediations:
-        lines.extend(["", "Next steps"])
+        lines.extend(["", text("cli_next_steps")])
         lines.extend(
             f"  {index}. {remediation}"
             for index, remediation in enumerate(report.remediations, start=1)
@@ -108,8 +112,8 @@ def render_doctor_report_rich(
         pad_edge=False,
     )
     table.add_column("", width=1)
-    table.add_column("Check", style=styles.value, no_wrap=True)
-    table.add_column("Detail", style=styles.muted, max_width=72)
+    table.add_column(text("cli_check"), style=styles.value, no_wrap=True)
+    table.add_column(text("cli_detail"), style=styles.muted, max_width=72)
     for check in report.checks:
         status = Text(
             "✓" if check.passed else "✗",
@@ -127,7 +131,9 @@ def render_doctor_report_rich(
                 for index, remediation in enumerate(report.remediations, start=1)
             )
         )
-        renderables.extend([Text(), Text("Next steps", style=styles.title), next_steps])
+        renderables.extend(
+            [Text(), Text(text("cli_next_steps"), style=styles.title), next_steps]
+        )
     body = Group(*renderables)
     if not framed:
         return body
@@ -142,25 +148,25 @@ def render_doctor_report_rich(
 
 
 _CONTEXT_STATUS_PRESENTATION = {
-    ContextStatus.UNBOUND: ("UNBOUND", "awsui.warning"),
-    ContextStatus.PROFILE_MISSING: ("PROFILE MISSING", "awsui.error"),
-    ContextStatus.READY: ("READY TO VERIFY", "awsui.title"),
-    ContextStatus.VERIFYING: ("VERIFYING", "awsui.title"),
-    ContextStatus.VERIFIED: ("VERIFIED", "awsui.success"),
-    ContextStatus.MISMATCH: ("MISMATCH", "awsui.error"),
-    ContextStatus.ERROR: ("ERROR", "awsui.error"),
+    ContextStatus.UNBOUND: ("cli_status_unbound", "awsui.warning"),
+    ContextStatus.PROFILE_MISSING: ("cli_status_profile_missing", "awsui.error"),
+    ContextStatus.READY: ("cli_status_ready", "awsui.title"),
+    ContextStatus.VERIFYING: ("cli_status_verifying", "awsui.title"),
+    ContextStatus.VERIFIED: ("cli_status_verified", "awsui.success"),
+    ContextStatus.MISMATCH: ("cli_status_mismatch", "awsui.error"),
+    ContextStatus.ERROR: ("cli_status_error", "awsui.error"),
 }
 
 
 def render_context_list(snapshot: DashboardSnapshot) -> str:
     """Render local project contexts as a stable plain-text table."""
     headers = (
-        "Environment",
-        "Account",
-        "Region",
-        "Profile",
-        "Status",
-        "Protection",
+        text("cli_environment"),
+        text("cli_account"),
+        text("cli_region"),
+        text("cli_profile"),
+        text("cli_status"),
+        text("cli_protection"),
     )
     rows = tuple(
         (
@@ -169,7 +175,7 @@ def render_context_list(snapshot: DashboardSnapshot) -> str:
             context.region,
             context.profile or "—",
             _context_status_label(context.status),
-            "PROTECTED" if context.protected else "—",
+            text("cli_protected") if context.protected else "—",
         )
         for context in snapshot.contexts
     )
@@ -183,7 +189,7 @@ def render_context_list(snapshot: DashboardSnapshot) -> str:
             value.ljust(width) for value, width in zip(row, widths, strict=True)
         ).rstrip()
 
-    lines = [f"Project: {snapshot.project}", "", format_row(headers)]
+    lines = [f"{text('cli_project')}: {snapshot.project}", "", format_row(headers)]
     lines.extend(format_row(row) for row in rows)
     return "\n".join(lines)
 
@@ -191,16 +197,16 @@ def render_context_list(snapshot: DashboardSnapshot) -> str:
 def render_context_list_rich(snapshot: DashboardSnapshot) -> RenderableType:
     """Render local project contexts as a Rich table."""
     table = Table(box=box.SIMPLE, show_edge=False, pad_edge=False)
-    table.add_column("Environment", style="awsui.title", no_wrap=True)
-    table.add_column("Account", style="awsui.value", no_wrap=True)
-    table.add_column("Region", style="awsui.value", no_wrap=True)
-    table.add_column("Profile", style="awsui.value", no_wrap=True)
-    table.add_column("Status", no_wrap=True)
-    table.add_column("Protection", no_wrap=True)
+    table.add_column(text("cli_environment"), style="awsui.title", no_wrap=True)
+    table.add_column(text("cli_account"), style="awsui.value", no_wrap=True)
+    table.add_column(text("cli_region"), style="awsui.value", no_wrap=True)
+    table.add_column(text("cli_profile"), style="awsui.value", no_wrap=True)
+    table.add_column(text("cli_status"), no_wrap=True)
+    table.add_column(text("cli_protection"), no_wrap=True)
     for context in snapshot.contexts:
         status, status_style = _context_status_presentation(context.status)
         protection = (
-            Text("PROTECTED", style="awsui.protected")
+            Text(text("cli_protected"), style="awsui.protected")
             if context.protected
             else Text("—", style="awsui.muted")
         )
@@ -217,7 +223,7 @@ def render_context_list_rich(snapshot: DashboardSnapshot) -> RenderableType:
         ("awsui", "awsui.title"),
         (" · ", "awsui.muted"),
         safe_text(snapshot.project, "awsui.value"),
-        (" / CONTEXTS", "awsui.title"),
+        (f" / {text('cli_contexts')}", "awsui.title"),
     )
     return Panel(table, title=title, border_style="cyan", expand=False)
 
@@ -242,10 +248,10 @@ def render_context_list_json(snapshot: DashboardSnapshot) -> str:
 
 
 def _context_status_presentation(status: ContextStatus) -> tuple[str, StyleType]:
-    return _CONTEXT_STATUS_PRESENTATION.get(
-        status,
-        (status.name.replace("_", " "), "awsui.muted"),
+    key, style = _CONTEXT_STATUS_PRESENTATION.get(
+        status, ("cli_status_error", "awsui.muted")
     )
+    return text(key), style
 
 
 def _context_status_label(status: ContextStatus) -> str:
@@ -254,12 +260,14 @@ def _context_status_label(status: ContextStatus) -> str:
 
 def render_bind_result(result: BindResult) -> str:
     binding = f"{result.project}/{result.environment} → {result.profile}"
-    return f"Bound {binding}" if result.changed else f"Binding unchanged: {binding}"
+    action = text("cli_bound") if result.changed else text("cli_binding_unchanged")
+    separator = " " if result.changed else ": "
+    return f"{action}{separator}{binding}"
 
 
 def render_bind_result_rich(result: BindResult) -> RenderableType:
     """Render a local profile binding result."""
-    action = "Bound" if result.changed else "Binding unchanged"
+    action = text("cli_bound") if result.changed else text("cli_binding_unchanged")
     message = Text.assemble(
         ("✓ ", "awsui.success"),
         (f"{action}  ", "awsui.success"),
@@ -277,11 +285,11 @@ def render_verified_context(verified: VerifiedContext) -> str:
     return "\n".join(
         [
             _context_heading(verified),
-            f"Expected account: {context.expected_account}",
-            f"Authenticated account: {verified.actual_account}",
-            f"Region: {context.region}",
-            f"Local profile: {context.profile}",
-            "Status: ✓ VERIFIED",
+            f"{text('cli_expected_account')}: {context.expected_account}",
+            f"{text('cli_authenticated_account')}: {verified.actual_account}",
+            f"{text('cli_region')}: {context.region}",
+            f"{text('cli_local_profile')}: {context.profile}",
+            f"{text('cli_status')}: ✓ {text('cli_verified')}",
         ]
     )
 
@@ -318,12 +326,12 @@ def render_account_mismatch(
     not_started: str | None = None,
 ) -> str:
     lines = [
-        "AWS CONTEXT MISMATCH",
+        text("cli_context_mismatch"),
         "",
-        f"Project: {error.project}",
-        f"Environment: {error.environment.upper()}",
-        f"Expected account: {error.expected_account}",
-        f"Authenticated account: {error.actual_account}",
+        f"{text('cli_project')}: {error.project}",
+        f"{text('cli_environment')}: {error.environment.upper()}",
+        f"{text('cli_expected_account')}: {error.expected_account}",
+        f"{text('cli_authenticated_account')}: {error.actual_account}",
     ]
     if not_started is not None:
         lines.extend(["", not_started])
@@ -338,11 +346,11 @@ def render_account_mismatch_rich(
 ) -> RenderableType:
     """Render a fail-closed account mismatch warning."""
     grid = _context_grid()
-    grid.add_row("Project", safe_text(error.project))
-    grid.add_row("Environment", safe_text(error.environment.upper()))
-    grid.add_row("Expected account", safe_text(error.expected_account))
+    grid.add_row(text("cli_project"), safe_text(error.project))
+    grid.add_row(text("cli_environment"), safe_text(error.environment.upper()))
+    grid.add_row(text("cli_expected_account"), safe_text(error.expected_account))
     grid.add_row(
-        "Authenticated account",
+        text("cli_authenticated_account"),
         safe_text(error.actual_account, "awsui.error"),
     )
     renderables: list[RenderableType] = [grid]
@@ -352,13 +360,13 @@ def render_account_mismatch_rich(
         renderables.extend(
             [
                 Text(),
-                Text("Next step", style="awsui.title"),
+                Text(text("cli_next_step"), style="awsui.title"),
                 safe_text(next_step, "awsui.value"),
             ]
         )
     return Panel(
         Group(*renderables),
-        title=Text("✗ AWS CONTEXT MISMATCH", style="awsui.error"),
+        title=Text(f"✗ {text('cli_context_mismatch')}", style="awsui.error"),
         border_style="red",
         expand=False,
     )
@@ -369,8 +377,8 @@ def render_launch_context(verified: VerifiedContext, launch_message: str) -> str
     return "\n".join(
         [
             _context_heading(verified),
-            f"Account: {verified.actual_account} ✓",
-            f"Region: {context.region}",
+            f"{text('cli_account')}: {verified.actual_account} ✓",
+            f"{text('cli_region')}: {context.region}",
             launch_message,
         ]
     )
@@ -384,7 +392,7 @@ def render_launch_context_rich(
     grid = _verified_identity_grid(verified)
     checks = _verification_checks(verified, context_prepared=True)
     launch = Text.assemble(
-        ("Launching  ", "awsui.label"),
+        (f"{text('cli_launching')}  ", "awsui.label"),
         safe_text(launch_message, "awsui.value"),
         ("…", "awsui.muted"),
     )
@@ -421,7 +429,7 @@ def render_failure_rich(
         renderables.extend(
             [
                 Text(),
-                Text("Next step", style="awsui.title"),
+                Text(text("cli_next_step"), style="awsui.title"),
                 safe_text(next_step, "awsui.value"),
             ]
         )
@@ -441,7 +449,7 @@ def render_cancelled_rich(message: str) -> Text:
 def _context_heading(verified: VerifiedContext) -> str:
     context = verified.resolved
     heading = f"{context.project} · {context.environment.upper()}"
-    return f"{heading} · PROTECTED" if context.protected else heading
+    return f"{heading} · {text('cli_protected')}" if context.protected else heading
 
 
 def _context_heading_rich(verified: VerifiedContext) -> Text:
@@ -455,7 +463,7 @@ def _context_heading_rich(verified: VerifiedContext) -> Text:
     )
     if context.protected:
         heading.append("  ")
-        heading.append("PROTECTED", style="awsui.protected")
+        heading.append(text("cli_protected"), style="awsui.protected")
     return heading
 
 
@@ -469,13 +477,18 @@ def _context_grid() -> Table:
 def _verified_identity_grid(verified: VerifiedContext) -> Table:
     context = verified.resolved
     grid = _context_grid()
-    grid.add_row("Profile", safe_text(context.profile))
-    grid.add_row("Account", safe_text(verified.actual_account))
-    grid.add_row("Region", safe_text(context.region))
+    grid.add_row(text("cli_profile"), safe_text(context.profile))
+    grid.add_row(text("cli_account"), safe_text(verified.actual_account))
+    grid.add_row(text("cli_region"), safe_text(context.region))
     principal = describe_principal(verified.principal_arn)
     if principal is not None:
         label, value = principal
-        grid.add_row(label, safe_text(value))
+        translated_label = {
+            "Role": text("field_role"),
+            "User": text("field_user"),
+            "Principal": text("field_principal"),
+        }.get(label, label)
+        grid.add_row(translated_label, safe_text(value))
     return grid
 
 
@@ -487,16 +500,20 @@ def _verification_checks(
     context = verified.resolved
     checks = Text.assemble(
         ("✓ ", "awsui.success"),
-        ("AWS identity verified", "awsui.success"),
+        (text("cli_identity_verified"), "awsui.success"),
         "\n",
         ("✓ ", "awsui.success"),
         (
-            f"Account matches {context.project}/{context.environment}",
+            text(
+                "cli_account_matches",
+                project=context.project,
+                environment=context.environment,
+            ),
             "awsui.success",
         ),
     )
     if context_prepared:
         checks.append("\n")
         checks.append("✓ ", style="awsui.success")
-        checks.append("AWS context prepared", style="awsui.success")
+        checks.append(text("cli_context_prepared"), style="awsui.success")
     return checks

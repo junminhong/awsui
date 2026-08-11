@@ -18,6 +18,7 @@ from .bindings import (
     save_bindings,
 )
 from .cli_console import CliConsole, safe_text
+from .i18n import text
 from .models import Profile
 from .profile_selection import (
     ProfileSelectionCancelled,
@@ -149,7 +150,7 @@ def _render_context(
 ) -> None:
     heading = f"{project} · {context.name.upper()}"
     if context.protected:
-        heading = f"{heading} · PROTECTED"
+        heading = f"{heading} · {text('cli_protected')}"
 
     output = CliConsole(stdout)
     if output.enhanced:
@@ -163,20 +164,20 @@ def _render_context(
         border_style = "cyan"
         if context.protected:
             title.append("  ")
-            title.append("PROTECTED", style="awsui.protected")
+            title.append(text("cli_protected"), style="awsui.protected")
         grid = Table.grid(padding=(0, 2))
         grid.add_column(style="awsui.label", no_wrap=True)
         grid.add_column(style="awsui.value")
-        grid.add_row("Expected account", safe_text(context.account))
-        grid.add_row("Region", safe_text(context.region))
+        grid.add_row(text("cli_expected_account"), safe_text(context.account))
+        grid.add_row(text("cli_region"), safe_text(context.region))
         if current_profile is not None:
-            grid.add_row("Current profile", safe_text(current_profile))
+            grid.add_row(text("cli_current_profile"), safe_text(current_profile))
         output.print(Panel(grid, title=title, border_style=border_style, expand=False))
         return
 
     print(heading, file=stdout)
-    print(f"Expected account: {context.account}", file=stdout)
-    print(f"Region: {context.region}", file=stdout)
+    print(f"{text('cli_expected_account')}: {context.account}", file=stdout)
+    print(f"{text('cli_region')}: {context.region}", file=stdout)
     print("", file=stdout)
     if current_profile is not None:
-        print(f"Current local profile: {current_profile}", file=stdout)
+        print(f"{text('cli_current_profile')}: {current_profile}", file=stdout)

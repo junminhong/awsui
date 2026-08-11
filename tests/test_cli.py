@@ -25,6 +25,7 @@ from awsui.init_command import (
 )
 from awsui.profile_catalog import ProfileCatalogError
 from awsui.project_config import ProjectConfigNotFoundError
+from awsui.settings import UserSettingsWriteError
 from awsui.tui_context import ContextItem, ContextStatus, DashboardSnapshot
 
 
@@ -126,13 +127,18 @@ class TestParseArgs:
         assert not hasattr(args, "profile")
         assert not hasattr(args, "region")
         assert args.lang == "en"
-        assert args.log_level == "INFO"
         assert args.command is None
 
     @pytest.mark.parametrize("option", ["--profile", "--region"])
     def test_removed_legacy_tui_options_are_rejected(self, option):
         with pytest.raises(SystemExit) as exc_info:
             parse_args([option, "legacy-value"])
+
+        assert exc_info.value.code == 2
+
+    def test_removed_log_level_option_is_rejected(self):
+        with pytest.raises(SystemExit) as exc_info:
+            parse_args(["--log-level", "DEBUG"])
 
         assert exc_info.value.code == 2
 
@@ -146,36 +152,13 @@ class TestParseArgs:
 
         assert args.lang == "zh-TW"
 
-    def test_log_level_debug(self):
-        args = parse_args(["--log-level", "DEBUG"])
-
-        assert args.log_level == "DEBUG"
-
-    def test_log_level_warning(self):
-        args = parse_args(["--log-level", "WARNING"])
-
-        assert args.log_level == "WARNING"
-
-    def test_multiple_arguments(self):
-        args = parse_args(
-            [
-                "--lang",
-                "zh-TW",
-                "--log-level",
-                "ERROR",
-            ]
-        )
-
-        assert args.lang == "zh-TW"
-        assert args.log_level == "ERROR"
-
     def test_help_identifies_existing_options(self):
         help_text = build_parser().format_help()
 
         assert "--profile" not in help_text
         assert "--region" not in help_text
         assert "--lang" in help_text
-        assert "--log-level" in help_text
+        assert "--log-level" not in help_text
         assert "bind" in help_text
         assert "init" in help_text
         assert "context" in help_text
@@ -282,6 +265,21 @@ class TestParseArgs:
         assert args.environment == "prod"
         assert args.child_command == ["codex", "--quiet"]
 
+    def test_language_option_precedes_environment_command_shorthand(self):
+        args = parse_args(["--lang", "zh-TW", "dev", "--", "codex", "."])
+
+        assert args.lang == "zh-TW"
+        assert args.command == "run"
+        assert args.environment == "dev"
+        assert args.child_command == ["codex", "."]
+
+    def test_traditional_chinese_parser_error_has_localized_wrapper(self, capsys):
+        with pytest.raises(SystemExit) as exc_info:
+            parse_args(["--lang", "zh-TW", "dev", "codex"])
+
+        assert exc_info.value.code == 2
+        assert "錯誤" in capsys.readouterr().err
+
     def test_environment_only_shorthand_opens_shell(self):
         args = parse_args(["qa"])
 
@@ -333,21 +331,83 @@ class TestMain:
         assert "context" in output
         assert "bind" in output
 
-    def test_explicit_options_show_cli_help(self, capsys):
-        exit_code = main(
-            [
-                "--lang",
-                "zh-TW",
-                "--log-level",
-                "DEBUG",
-            ]
-        )
+    def test_language_switch_is_remembered(
+        self,
+        capsys,
+        isolated_cli_settings,
+    ):
+        exit_code = main(["--lang", "zh-TW"])
 
         assert exit_code == 0
+        assert capsys.readouterr().out == "語言已切換為繁體中文。\n"
+
+        assert main([]) == 0
         output = capsys.readouterr().out
-        assert "Usage: awsui" in output
+        assert "用法： awsui" in output
+        assert "快速開始" in output
+        assert "初始化此專案" in output
         assert "--lang {zh-TW,en}" in output
-        assert "--log-level {DEBUG,INFO,WARNING,ERROR}" in output
+        assert "--log-level" not in output
+        assert json.loads(isolated_cli_settings.read_text(encoding="utf-8")) == {
+            "language": "zh-TW",
+            "version": 1,
+        }
+
+        assert main(["--lang", "en"]) == 0
+        assert capsys.readouterr().out == "Language switched to English.\n"
+        assert main([]) == 0
+        assert "Usage: awsui" in capsys.readouterr().out
+
+    def test_language_switch_with_help_is_persisted(
+        self,
+        capsys,
+        isolated_cli_settings,
+    ):
+        with pytest.raises(SystemExit) as exc_info:
+            main(["--lang", "zh-TW", "--help"])
+
+        assert exc_info.value.code == 0
+        assert "用法： awsui" in capsys.readouterr().out
+        assert json.loads(isolated_cli_settings.read_text(encoding="utf-8"))[
+            "language"
+        ] == "zh-TW"
+
+    def test_explicit_language_repairs_damaged_settings(
+        self,
+        capsys,
+        isolated_cli_settings,
+    ):
+        isolated_cli_settings.parent.mkdir(parents=True)
+        isolated_cli_settings.write_text("{invalid", encoding="utf-8")
+
+        assert main([]) == 1
+        assert "Unable to load user settings" in capsys.readouterr().err
+
+        assert main(["--lang", "zh-TW"]) == 0
+        assert capsys.readouterr().out == "語言已切換為繁體中文。\n"
+        assert json.loads(isolated_cli_settings.read_text(encoding="utf-8"))[
+            "language"
+        ] == "zh-TW"
+
+    @patch("awsui.cli.load_dashboard")
+    @patch("awsui.cli.save_settings")
+    def test_language_write_failure_does_not_dispatch(
+        self,
+        mock_save_settings,
+        mock_load_dashboard,
+        capsys,
+        isolated_cli_settings,
+    ):
+        mock_save_settings.side_effect = UserSettingsWriteError(
+            isolated_cli_settings,
+            "write denied",
+        )
+
+        exit_code = main(["--lang", "zh-TW", "context", "ls"])
+
+        assert exit_code == 1
+        assert "無法儲存語言偏好" in capsys.readouterr().err
+        mock_load_dashboard.assert_not_called()
 
     @patch("awsui.cli.main", return_value=7)
     def test_app_module_entry_point_delegates_to_cli(self, mock_cli_main):
@@ -659,6 +719,30 @@ class TestMain:
                 },
             ],
         }
+
+    @patch("awsui.cli.load_dashboard")
+    def test_context_list_uses_traditional_chinese(self, mock_load_dashboard, capsys):
+        mock_load_dashboard.return_value = dashboard_snapshot()
+
+        exit_code = main(["--lang", "zh-TW", "context", "ls"])
+
+        assert exit_code == 0
+        output = capsys.readouterr().out
+        assert "專案: payment-service" in output
+        assert "環境" in output
+        assert "找不到 PROFILE" in output
+        assert "受保護環境" in output
+
+    @patch("awsui.cli.load_dashboard")
+    def test_context_list_json_is_language_neutral(self, mock_load_dashboard, capsys):
+        mock_load_dashboard.return_value = dashboard_snapshot()
+
+        exit_code = main(["--lang", "zh-TW", "context", "list", "--json"])
+
+        assert exit_code == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert list(payload) == ["project", "contexts"]
+        assert payload["contexts"][0]["status"] == "ready"
 
     @pytest.mark.parametrize(
         ("error", "next_step"),

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .aws_cli import check_aws_cli_available
 from .bindings import LocalBindingsError, load_bindings
+from .i18n import text
 from .config import parse_profiles
 from .models import Profile
 from .profile_catalog import ProfileCatalogError, load_profile_catalog
@@ -59,9 +60,13 @@ def diagnose(
     aws_cli_available = aws_cli_checker()
     checks.append(
         DoctorCheck(
-            name="AWS CLI v2",
+            name=text("doctor_aws_cli"),
             passed=aws_cli_available,
-            detail="available" if aws_cli_available else "not found or not AWS CLI v2",
+            detail=(
+                text("doctor_available")
+                if aws_cli_available
+                else text("doctor_not_found")
+            ),
             remediation=(
                 None
                 if aws_cli_available
@@ -76,7 +81,7 @@ def diagnose(
     except ProjectConfigNotFoundError as exc:
         checks.append(
             DoctorCheck(
-                "Project configuration",
+                text("doctor_project_config"),
                 False,
                 str(exc),
                 "Run `awsui init` from the project root.",
@@ -86,7 +91,7 @@ def diagnose(
     except ProjectConfigError as exc:
         checks.append(
             DoctorCheck(
-                "Project configuration",
+                text("doctor_project_config"),
                 False,
                 str(exc),
                 f"Fix `{exc.path}`, then rerun `awsui doctor`.",
@@ -95,7 +100,7 @@ def diagnose(
         return DoctorReport(tuple(checks))
     checks.append(
         DoctorCheck(
-            "Project configuration",
+            text("doctor_project_config"),
             True,
             f"{config.project} at {config.source_path}",
         )
@@ -106,7 +111,7 @@ def diagnose(
     except LocalBindingsError as exc:
         checks.append(
             DoctorCheck(
-                "Local bindings",
+                text("doctor_local_bindings"),
                 False,
                 str(exc),
                 f"Check permissions and JSON format for `{exc.path}`, then rerun "
@@ -114,7 +119,9 @@ def diagnose(
             )
         )
         return DoctorReport(tuple(checks))
-    checks.append(DoctorCheck("Local bindings", True, str(bindings.source_path)))
+    checks.append(
+        DoctorCheck(text("doctor_local_bindings"), True, str(bindings.source_path))
+    )
 
     try:
         catalog = load_profile_catalog(lambda: list(profiles_loader()))
@@ -122,7 +129,7 @@ def diagnose(
     except ProfileCatalogError as exc:
         checks.append(
             DoctorCheck(
-                "Local AWS profiles",
+                text("doctor_local_profiles"),
                 False,
                 str(exc),
                 "Check your AWS config and credentials files, then rerun "
@@ -133,9 +140,11 @@ def diagnose(
     first_environment = min(config.contexts)
     checks.append(
         DoctorCheck(
-            "Local AWS profiles",
+            text("doctor_local_profiles"),
             bool(profile_names),
-            f"{len(profile_names)} profile(s) found" if profile_names else "none found",
+            text("doctor_profiles_found", count=len(profile_names))
+            if profile_names
+            else text("doctor_none_found"),
             (
                 None
                 if profile_names
@@ -147,13 +156,13 @@ def diagnose(
 
     for environment in sorted(config.contexts):
         profile = bindings.get_profile(config.project, environment)
-        check_name = f"Context {environment}"
+        check_name = text("doctor_context", environment=environment)
         if profile is None:
             checks.append(
                 DoctorCheck(
                     check_name,
                     False,
-                    "not bound",
+                    text("doctor_not_bound"),
                     f"Run `awsui bind {environment}`.",
                 )
             )
@@ -162,12 +171,14 @@ def diagnose(
                 DoctorCheck(
                     check_name,
                     False,
-                    f"bound profile {profile!r} was not found locally",
+                    text("doctor_profile_missing", profile=profile),
                     f"Run `awsui bind {environment}` to select or create a "
                     "replacement profile.",
                 )
             )
         else:
-            checks.append(DoctorCheck(check_name, True, f"bound to {profile}"))
+            checks.append(
+                DoctorCheck(check_name, True, text("doctor_bound", profile=profile))
+            )
 
     return DoctorReport(tuple(checks))

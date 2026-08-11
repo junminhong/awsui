@@ -1,7 +1,19 @@
 """Pytest configuration and fixtures."""
 
-import pytest
 import os
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def isolated_cli_settings(tmp_path, monkeypatch):
+    """Keep CLI preference tests away from the real user settings file."""
+    settings_path = tmp_path / ".config" / "awsui" / "settings.json"
+    monkeypatch.setattr(
+        "awsui.cli.get_default_settings_path",
+        lambda: settings_path,
+    )
+    return settings_path
 
 
 @pytest.fixture

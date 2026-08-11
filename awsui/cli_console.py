@@ -49,6 +49,7 @@ class CliConsole:
             color_system=color_system,
             force_terminal=force_terminal,
             width=width,
+            _environ=env,
         )
 
     @property

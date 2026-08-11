@@ -334,6 +334,7 @@ def test_human_context_command_uses_rich_on_a_tty(
     monkeypatch,
 ):
     monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setenv("TERM", "xterm-256color")
     verified = _verified_context()
     mock_resolve.return_value = verified.resolved
     mock_prepare.return_value = VerifiedRuntime(verified=verified, environment={})
@@ -359,6 +360,7 @@ def test_context_json_stays_unstyled_even_when_stdout_is_a_tty(
     monkeypatch,
 ):
     monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setenv("TERM", "xterm-256color")
     verified = _verified_context(project="付款[prod]", profile="公司[prod]")
     mock_resolve.return_value = verified.resolved
     mock_prepare.return_value = VerifiedRuntime(verified=verified, environment={})

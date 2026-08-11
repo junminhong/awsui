@@ -2,7 +2,7 @@
 
 import re
 
-from awsui.i18n import LANG_EN, LANG_ZH_TW
+from awsui.i18n import LANG_EN, LANG_ZH_TW, text, use_language
 
 
 def test_languages_have_the_same_nonempty_string_keys():
@@ -43,3 +43,12 @@ def test_removed_legacy_tui_features_are_not_translated():
     assert "amazon q" not in text
     assert "autocomplete" not in text
     assert "cheatsheet" not in text
+
+
+def test_cli_language_scope_is_isolated_and_restored():
+    assert text("cli_project") == "Project"
+
+    with use_language("zh-TW"):
+        assert text("cli_project") == "專案"
+
+    assert text("cli_project") == "Project"

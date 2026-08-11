@@ -8,6 +8,7 @@ from typing import TextIO
 from .aws_cli import AwsCliInfo
 from .cli_console import CliConsole, safe_text
 from .interactive import InputClosedError, read_line
+from .i18n import text
 from .interactive_selector import (
     SelectionOption,
     SelectorInputClosed,
@@ -67,7 +68,11 @@ def render_profiles(
         if profile.get("region"):
             details.append(profile["region"])
         detail_text = " · ".join(details)
-        current_marker = " [current]" if profile["name"] == current_profile else ""
+        current_marker = (
+            f" [{text('cli_current_marker')}]"
+            if profile["name"] == current_profile
+            else ""
+        )
         print(
             f"  {index}. {profile['name']} ({detail_text}){current_marker}",
             file=stdout,
@@ -76,7 +81,7 @@ def render_profiles(
     if current_profile is not None and current_profile not in profile_names:
         print("", file=stdout)
         print(
-            f"Current binding {current_profile!r} was not found in local AWS profiles.",
+            text("cli_missing_binding", profile=current_profile),
             file=stdout,
         )
 
@@ -105,14 +110,14 @@ def prompt_profile_choice(
 
     while True:
         if profiles:
-            prompt = f"Profile [1-{len(profiles)}]"
+            prompt = text("cli_profile_prompt_range", count=len(profiles))
         else:
-            prompt = "Profile"
+            prompt = text("cli_profile_prompt")
         if current_is_available:
-            prompt += f" (Enter keeps {current_profile})"
+            prompt += text("cli_profile_keep", profile=current_profile)
         if allow_create:
-            prompt += ", c to create"
-        prompt += ", or q to cancel: "
+            prompt += text("cli_profile_create_key")
+        prompt += text("cli_profile_cancel_key")
         try:
             selection = read_line(prompt, stdin=stdin, stdout=stdout)
         except InputClosedError as exc:
@@ -142,7 +147,7 @@ def prompt_profile_choice(
         accepted = "a listed number, an exact profile name"
         if allow_create:
             accepted += ", c to create"
-        message = f"Invalid selection. Enter {accepted}, or q to cancel."
+        message = text("cli_invalid_profile_selection", accepted=accepted)
         output.print(
             safe_text(message, "awsui.warning"),
             plain=message,
@@ -219,9 +224,9 @@ def _render_catalog(
     current_profile: str | None,
     stdout: TextIO,
 ) -> None:
-    print("Local AWS profiles:", file=stdout)
+    print(f"{text('cli_local_profiles')}:", file=stdout)
     if not catalog.profiles:
-        print("  No local AWS profiles found.", file=stdout)
+        print(f"  {text('cli_no_profiles')}", file=stdout)
     render_profiles(
         catalog.profiles,
         current_profile=current_profile,
@@ -239,9 +244,12 @@ def _prompt_profile_choice_with_arrows(
 ) -> ProfileChoice:
     options: list[SelectionOption[ProfileChoice]] = []
     for profile in profiles:
-        detail_parts = [profile["kind"], profile.get("region") or "no region"]
+        detail_parts = [
+            profile["kind"],
+            profile.get("region") or text("cli_no_region"),
+        ]
         if profile["name"] == current_profile:
-            detail_parts.append("current")
+            detail_parts.append(text("cli_current"))
         options.append(
             SelectionOption(
                 profile["name"],
@@ -254,16 +262,16 @@ def _prompt_profile_choice_with_arrows(
     if allow_create:
         options.append(
             SelectionOption(
-                "Create new AWS profile…",
+                text("cli_create_profile"),
                 create_choice,
-                "Console Login, SSO, or access key",
+                text("cli_create_profile_detail"),
                 separator_before=True,
             )
         )
     cancel_choice = ProfileChoice(ProfileChoiceKind.CANCEL)
     options.append(
         SelectionOption(
-            "Cancel",
+            text("cli_cancel"),
             cancel_choice,
             separator_before=not allow_create,
         )
@@ -287,7 +295,7 @@ def _prompt_profile_choice_with_arrows(
     )
     try:
         return select_option(
-            "Local AWS profile",
+            text("cli_profile_selection"),
             options,
             default=default,
             stdin=stdin,
@@ -305,5 +313,5 @@ def _render_missing_current_binding(
 ) -> None:
     if current_profile is None or catalog.get(current_profile) is not None:
         return
-    message = f"Current binding {current_profile!r} was not found locally."
+    message = text("cli_missing_binding_short", profile=current_profile)
     CliConsole(stdout).print(safe_text(f"! {message}", "awsui.warning"), plain=message)

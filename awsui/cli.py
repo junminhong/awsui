@@ -3,6 +3,7 @@
 from argparse import ArgumentParser, Namespace, REMAINDER
 from collections.abc import Sequence
 import os
+from pathlib import Path
 import shlex
 import sys
 
@@ -60,8 +61,17 @@ from .init_command import (
     InitCommandError,
     initialize_project,
 )
+from .i18n import text, use_language
 from .profile_catalog import ProfileCatalogError
 from .project_config import ProjectConfigError, ProjectConfigNotFoundError
+from .settings import (
+    SUPPORTED_LANGUAGES,
+    UserSettingsError,
+    get_default_settings_path,
+    load_settings,
+    save_settings,
+    settings_with_language,
+)
 from .tui_context import load_dashboard
 
 
@@ -69,13 +79,13 @@ _COMMANDS = frozenset({"init", "bind", "context", "run", "shell", "doctor"})
 _BIND_LIST_ALIASES = frozenset({"ls", "list"})
 _CONTEXT_LIST_ALIASES = frozenset({"ls", "list"})
 _HELP_EPILOG = """\
-Quick start:
+{quick_start}:
   awsui init
   awsui prod -- codex
   awsui prod
   awsui context prod
 
-Compatibility:
+{compatibility}:
   awsui run prod -- codex
   awsui shell prod
 """
@@ -99,181 +109,313 @@ class AwsuiHelpFormatter(RawDescriptionRichHelpFormatter):
 class AwsuiArgumentParser(ArgumentParser):
     """Argument parser with TTY-aware actionable errors."""
 
+    def __init__(self, *args: object, lang: str = "en", **kwargs: object) -> None:
+        self.lang = lang
+        super().__init__(*args, **kwargs)
+
     def error(self, message: str) -> None:
         output = CliConsole(sys.stderr)
         if not output.enhanced:
+            if self.lang == "zh-TW":
+                self.print_usage(sys.stderr)
+                self.exit(2, f"{self.prog}：錯誤：{message}\n")
             super().error(message)
         output.print(
             render_failure_rich(
-                "Invalid command",
+                text("cli_invalid_command", lang=self.lang),
                 message,
-                next_step=f"Run `{self.prog} --help` for usage.",
+                next_step=(
+                    f"執行 `{self.prog} --help` 查看用法。"
+                    if self.lang == "zh-TW"
+                    else f"Run `{self.prog} --help` for usage."
+                ),
             )
         )
         self.exit(2)
 
+    def format_help(self) -> str:
+        rendered = super().format_help()
+        if self.lang == "zh-TW":
+            rendered = rendered.replace("Usage:", "用法：", 1)
+        return rendered
 
-def build_parser() -> ArgumentParser:
+
+def build_parser(lang: str = "en") -> ArgumentParser:
     """Build the awsui command-line parser."""
     parser = AwsuiArgumentParser(
         prog="awsui",
-        description="Verified AWS contexts for AI agents and CLI tools",
-        epilog=_HELP_EPILOG,
+        description=text("cli_description", lang=lang),
+        epilog=_HELP_EPILOG.format(
+            quick_start=text("cli_quick_start", lang=lang),
+            compatibility=text("cli_compatibility", lang=lang),
+        ),
         formatter_class=AwsuiHelpFormatter,
+        lang=lang,
+        add_help=False,
     )
+    _add_localized_help(parser, lang)
     parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {__version__}",
+        help=text("cli_version_option", lang=lang),
     )
 
     parser.add_argument(
         "--lang",
         choices=["zh-TW", "en"],
-        default="en",
-        help="UI language (default: en)",
-    )
-    parser.add_argument(
-        "--log-level",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        default="INFO",
-        help="Logging level (default: INFO)",
+        default=lang,
+        help=text("cli_language_option", lang=lang),
     )
 
     subparsers = parser.add_subparsers(
         dest="command",
         parser_class=AwsuiArgumentParser,
     )
-    subparsers.add_parser(
+    init_parser = subparsers.add_parser(
         "init",
-        help="Initialize verified AWS contexts for this project",
-        description="Initialize verified AWS contexts for this project",
+        help=text("cli_init_help", lang=lang),
+        description=text("cli_init_help", lang=lang),
         formatter_class=AwsuiHelpFormatter,
+        lang=lang,
+        add_help=False,
     )
+    _add_localized_help(init_parser, lang)
     bind_parser = subparsers.add_parser(
         "bind",
-        help="Bind or list project environment AWS profiles",
-        description="Bind or list project environment AWS profiles",
+        help=text("cli_bind_help", lang=lang),
+        description=text("cli_bind_help", lang=lang),
         formatter_class=AwsuiHelpFormatter,
+        lang=lang,
+        add_help=False,
     )
+    _add_localized_help(bind_parser, lang)
     bind_parser.add_argument(
         "environment",
-        help="Environment to bind, or `ls`/`list` to list bindings",
+        help=text("cli_bind_environment_help", lang=lang),
     )
     bind_parser.add_argument(
         "--json",
         action="store_true",
-        help="Output the binding list as JSON (only with `ls`/`list`)",
+        help=text("cli_bind_json_help", lang=lang),
     )
 
     context_parser = subparsers.add_parser(
         "context",
-        help="Show, verify, or list project AWS contexts",
-        description="Show, verify, or list project AWS contexts",
+        help=text("cli_context_help", lang=lang),
+        description=text("cli_context_help", lang=lang),
         formatter_class=AwsuiHelpFormatter,
+        lang=lang,
+        add_help=False,
     )
+    _add_localized_help(context_parser, lang)
     context_parser.add_argument(
         "environment",
-        help="Project environment to show, or `ls`/`list` to list contexts",
+        help=text("cli_context_environment_help", lang=lang),
     )
     context_parser.add_argument(
         "--json",
         action="store_true",
-        help="Output the context or context list as JSON",
+        help=text("cli_context_json_help", lang=lang),
     )
 
     run_parser = subparsers.add_parser(
         "run",
-        help="Run a command in a verified project AWS context",
-        description="Run a command in a verified project AWS context",
+        help=text("cli_run_help", lang=lang),
+        description=text("cli_run_help", lang=lang),
         formatter_class=AwsuiHelpFormatter,
+        lang=lang,
+        add_help=False,
     )
-    run_parser.add_argument("environment", help="Project environment to use")
+    _add_localized_help(run_parser, lang)
+    run_parser.add_argument(
+        "environment", help=text("cli_run_environment_help", lang=lang)
+    )
     run_parser.add_argument(
         "child_command",
         nargs=REMAINDER,
-        help="Command and arguments to launch",
+        help=text("cli_run_command_help", lang=lang),
     )
 
     shell_parser = subparsers.add_parser(
         "shell",
-        help="Open a shell in a verified project AWS context",
-        description="Open a shell in a verified project AWS context",
+        help=text("cli_shell_help", lang=lang),
+        description=text("cli_shell_help", lang=lang),
         formatter_class=AwsuiHelpFormatter,
+        lang=lang,
+        add_help=False,
     )
-    shell_parser.add_argument("environment", help="Project environment to use")
+    _add_localized_help(shell_parser, lang)
+    shell_parser.add_argument(
+        "environment", help=text("cli_shell_environment_help", lang=lang)
+    )
 
-    subparsers.add_parser(
+    doctor_parser = subparsers.add_parser(
         "doctor",
-        help="Diagnose local project context configuration",
-        description="Diagnose local project context configuration without authenticating",
+        help=text("cli_doctor_help", lang=lang),
+        description=text("cli_doctor_help", lang=lang),
         formatter_class=AwsuiHelpFormatter,
+        lang=lang,
+        add_help=False,
     )
+    _add_localized_help(doctor_parser, lang)
+
+    if lang == "zh-TW":
+        parser._positionals.title = text("cli_commands", lang=lang)
+        parser._optionals.title = text("cli_options", lang=lang)
 
     return parser
 
 
-def parse_args(argv: Sequence[str] | None = None) -> Namespace:
+def _add_localized_help(parser: ArgumentParser, lang: str) -> None:
+    """Add help with a catalog-backed description and localized group labels."""
+    parser.add_argument(
+        "-h",
+        "--help",
+        action="help",
+        help=text("cli_help_option", lang=lang),
+    )
+    if lang == "zh-TW":
+        parser._positionals.title = text("cli_commands", lang=lang)
+        parser._optionals.title = text("cli_options", lang=lang)
+
+
+def parse_args(
+    argv: Sequence[str] | None = None,
+    *,
+    default_lang: str = "en",
+) -> Namespace:
     """Parse command-line arguments from argv or the current process."""
     raw_argv = list(sys.argv[1:] if argv is None else argv)
-    parser = build_parser()
+    lang = _requested_language(raw_argv) or default_lang
+    parser = build_parser(lang)
     normalized, error = _normalize_shorthand(raw_argv)
     if error is not None:
         parser.error(error)
     return parser.parse_args(normalized)
 
 
+def _requested_language(argv: Sequence[str]) -> str | None:
+    """Read the requested language before constructing localized help."""
+    for index, value in enumerate(argv):
+        if value.startswith("--lang="):
+            return value.partition("=")[2]
+        if value == "--lang" and index + 1 < len(argv):
+            return argv[index + 1]
+    return None
+
+
 def _normalize_shorthand(argv: list[str]) -> tuple[list[str], str | None]:
     """Translate `awsui <environment> [-- command]` to legacy subcommands."""
-    if not argv or argv[0].startswith("-") or argv[0] in _COMMANDS:
+    prefix: list[str] = []
+    index = 0
+    while index < len(argv):
+        value = argv[index]
+        if value.startswith("--lang="):
+            prefix.append(value)
+            index += 1
+            continue
+        if value == "--lang" and index + 1 < len(argv):
+            prefix.extend(argv[index : index + 2])
+            index += 2
+            continue
+        break
+
+    remainder_argv = argv[index:]
+    if (
+        not remainder_argv
+        or remainder_argv[0].startswith("-")
+        or remainder_argv[0] in _COMMANDS
+    ):
         return argv, None
 
-    environment, *remainder = argv
+    environment, *remainder = remainder_argv
     if not remainder:
-        return ["shell", environment], None
+        return [*prefix, "shell", environment], None
     if remainder[0] != "--":
         example = f"awsui {environment} -- {shlex.join(remainder)}"
         return argv, f"commands after an environment require `--`; use `{example}`"
     if len(remainder) == 1:
         return argv, "a command is required after `--`"
-    return ["run", environment, *remainder], None
+    return [*prefix, "run", environment, *remainder], None
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Dispatch an awsui command or show CLI help when none is selected."""
-    args = parse_args(argv)
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    settings_path: Path | None = None,
+) -> int:
+    """Load user preferences, then dispatch one localized CLI invocation."""
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    explicit_language = _requested_language(raw_argv)
+    selected_path = (
+        get_default_settings_path() if settings_path is None else settings_path
+    )
 
-    if args.command is not None:
-        invalid_options = _tui_only_options(args)
-        if invalid_options:
-            rendered = ", ".join(invalid_options)
-            message = (
-                f"awsui {args.command}: error: TUI-only options are not valid "
-                f"with {args.command}: {rendered}"
+    try:
+        settings = load_settings(selected_path)
+    except UserSettingsError as exc:
+        if explicit_language not in SUPPORTED_LANGUAGES:
+            return _settings_failure(
+                text("cli_settings_unavailable", lang="en"),
+                exc,
+                lang="en",
             )
-            CliConsole(sys.stderr).print(
-                render_failure_rich(
-                    "Invalid options",
-                    message,
-                    next_step=f"Run `awsui {args.command} --help` for usage.",
-                ),
-                plain=message,
-            )
-            return 2
+        settings = settings_with_language(explicit_language, selected_path)
 
+    if explicit_language in SUPPORTED_LANGUAGES:
+        settings = settings_with_language(explicit_language, selected_path)
+        try:
+            save_settings(settings)
+        except UserSettingsError as exc:
+            return _settings_failure(
+                text("cli_settings_write_failed", lang=explicit_language),
+                exc,
+                lang=explicit_language,
+            )
+
+    effective_language = (
+        explicit_language
+        if explicit_language in SUPPORTED_LANGUAGES
+        else settings.language
+    )
+    args = parse_args(raw_argv, default_lang=effective_language)
+    with use_language(args.lang):
+        if args.command is None and explicit_language in SUPPORTED_LANGUAGES:
+            key = (
+                "cli_language_switched_zh_tw"
+                if explicit_language == "zh-TW"
+                else "cli_language_switched_en"
+            )
+            print(text(key))
+            return 0
+        return _dispatch(args)
+
+
+def _settings_failure(title: str, error: UserSettingsError, *, lang: str) -> int:
+    """Render a settings failure without depending on the damaged preference."""
+    with use_language(lang):
+        detail = str(error)
+        next_step = text("cli_settings_recover")
+        CliConsole(sys.stderr).print(
+            render_failure_rich(title, detail, next_step=next_step),
+            plain=f"{title}: {detail}\n{text('cli_next_step')}: {next_step}",
+        )
+    return 1
+
+
+def _dispatch(args: Namespace) -> int:
+    """Dispatch parsed arguments within the active language scope."""
     if args.command == "bind":
         if args.environment in _BIND_LIST_ALIASES:
             return _run_context_list(json_output=args.json, command_name="bind")
         if args.json:
-            message = (
-                "awsui bind: error: `--json` is only valid with "
-                "`awsui bind ls` or `awsui bind list`"
-            )
+            message = text("cli_bind_json_error")
             CliConsole(sys.stderr).print(
                 render_failure_rich(
-                    "Invalid bind options",
+                    text("cli_invalid_bind_options"),
                     message,
-                    next_step="Run `awsui bind ls --json` to list local bindings.",
+                    next_step=text("cli_bind_json_next"),
                 ),
                 plain=message,
             )
@@ -290,12 +432,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "run":
         if not args.child_command:
-            message = "awsui run: error: a command is required after the environment"
+            message = text("cli_command_required_detail")
             CliConsole(sys.stderr).print(
                 render_failure_rich(
-                    "Command required",
+                    text("cli_command_required"),
                     message,
-                    next_step=f"Run `awsui {args.environment} -- <command>`.",
+                    next_step=text(
+                        "cli_run_help_usage", environment=args.environment
+                    ),
                 ),
                 plain=message,
             )
@@ -308,17 +452,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "doctor":
         return _run_doctor()
 
-    build_parser().print_help()
+    build_parser(args.lang).print_help()
     return 0
-
-
-def _tui_only_options(args: Namespace) -> list[str]:
-    invalid_options: list[str] = []
-    if args.lang != "en":
-        invalid_options.append("--lang")
-    if args.log_level != "INFO":
-        invalid_options.append("--log-level")
-    return invalid_options
 
 
 def _run_bind(environment: str) -> int:
@@ -327,20 +462,20 @@ def _run_bind(environment: str) -> int:
     try:
         result = bind_environment(environment)
     except BindCommandCancelled as exc:
-        message = f"awsui bind: {exc}"
+        message = text("cli_bind_cancelled_detail", detail=exc)
         errors.print(render_cancelled_rich(message), plain=message)
         return 130
     except KeyboardInterrupt:
-        message = "awsui bind: binding cancelled"
+        message = text("cli_bind_cancelled")
         errors.print(render_cancelled_rich(message), plain=message)
         return 130
     except BindCommandError as exc:
-        message = f"awsui bind: error: {exc}"
+        message = text("cli_command_error", command="bind", detail=exc)
         errors.print(
             render_failure_rich(
-                "Unable to bind environment",
+                text("cli_bind_failed"),
                 str(exc),
-                next_step="Run `awsui doctor` to inspect the project contexts.",
+                next_step=text("cli_bind_doctor"),
             ),
             plain=message,
         )
@@ -356,20 +491,20 @@ def _run_init() -> int:
     try:
         result = initialize_project()
     except InitCommandCancelled as exc:
-        message = f"awsui init: {exc}"
+        message = text("cli_init_cancelled_detail", detail=exc)
         errors.print(render_cancelled_rich(message), plain=message)
         return 130
     except KeyboardInterrupt:
-        message = "awsui init: initialization cancelled"
+        message = text("cli_init_cancelled")
         errors.print(render_cancelled_rich(message), plain=message)
         return 130
     except InitCommandError as exc:
-        message = f"awsui init: error: {exc}"
+        message = text("cli_command_error", command="init", detail=exc)
         errors.print(
             render_failure_rich(
-                "Initialization failed",
+                text("cli_init_failed"),
                 str(exc),
-                next_step="Fix the reported project configuration issue and retry.",
+                next_step=text("cli_fix_init"),
             ),
             plain=message,
         )
@@ -397,14 +532,14 @@ def _run_context_list(
         snapshot = load_dashboard()
     except (ProjectConfigError, LocalBindingsError, ProfileCatalogError) as exc:
         next_step = (
-            "Run `awsui init` from the project root."
+            text("cli_run_init")
             if isinstance(exc, ProjectConfigNotFoundError)
-            else "Run `awsui doctor` and fix the reported configuration issue."
+            else text("cli_run_doctor")
         )
-        message = f"awsui {command_name}: error: {exc}"
+        message = text("cli_command_error", command=command_name, detail=exc)
         CliConsole(sys.stderr).print(
             render_failure_rich(
-                "Unable to list project contexts",
+                text("cli_list_failed"),
                 str(exc),
                 next_step=next_step,
             ),
@@ -445,10 +580,10 @@ def _prepare_cli_runtime(
     try:
         resolved = resolve_context(environment)
     except ContextResolutionError as exc:
-        message = f"awsui {command_name}: error: {exc}"
+        message = text("cli_command_error", command=command_name, detail=exc)
         errors.print(
             render_failure_rich(
-                "AWS context unavailable",
+                text("cli_context_unavailable"),
                 str(exc),
                 next_step=_resolution_next_step(exc, environment),
                 not_started=_not_started_message(command_name),
@@ -457,7 +592,7 @@ def _prepare_cli_runtime(
         )
         return None, 1
 
-    status = "Authenticating and verifying AWS identity..."
+    status = text("cli_authenticating")
     errors.print(
         render_status_rich(status),
         plain=status,
@@ -475,24 +610,22 @@ def _prepare_cli_runtime(
             render_account_mismatch_rich(
                 exc,
                 not_started=not_started,
-                next_step=f"Run `awsui bind {environment}` to select the intended "
-                "local profile, then retry.",
+                next_step=text("cli_rebind", environment=environment),
             ),
             plain=render_account_mismatch(exc, not_started=not_started),
         )
         return None, 1
     except KeyboardInterrupt:
-        message = f"awsui {command_name}: verification cancelled"
+        message = text("cli_verification_cancelled", command=command_name)
         errors.print(render_cancelled_rich(message), plain=message)
         return None, 130
     except ContextVerificationError as exc:
-        message = f"awsui {command_name}: error: {exc}"
+        message = text("cli_command_error", command=command_name, detail=exc)
         not_started = _not_started_message(command_name)
         rich_failure = render_failure_rich(
-            "AWS identity verification failed",
+            text("cli_verification_failed"),
             str(exc),
-            next_step="Run `awsui doctor`; if local checks pass, verify the bound "
-            "profile with AWS CLI.",
+            next_step=text("cli_verify_profile"),
             not_started=not_started,
         )
         errors.print(rich_failure, plain=message)
@@ -513,19 +646,19 @@ def _run_in_context(environment: str, command: Sequence[str]) -> int:
         render_launch_context_rich(runtime.verified, command_text),
         plain=render_launch_context(
             runtime.verified,
-            f"Launching: {command_text}",
+            text("cli_launching_plain", command=command_text),
         ),
         flush=True,
     )
     try:
         return run_command(command, environment=runtime.environment)
     except CommandLaunchError as exc:
-        message = f"awsui run: error: {exc}"
+        message = text("cli_command_error", command="run", detail=exc)
         CliConsole(sys.stderr).print(
             render_failure_rich(
-                "Command could not start",
+                text("cli_command_start_failed"),
                 str(exc),
-                next_step="Install the command or ensure it is available on PATH.",
+                next_step=text("cli_install_command"),
             ),
             plain=message,
         )
@@ -542,19 +675,19 @@ def _run_context_shell(environment: str) -> int:
         render_launch_context_rich(runtime.verified, f"shell: {shell}"),
         plain=render_launch_context(
             runtime.verified,
-            f"Launching shell: {shell}",
+            text("cli_launching_shell", shell=shell),
         ),
         flush=True,
     )
     try:
         return run_command([shell], environment=runtime.environment)
     except CommandLaunchError as exc:
-        message = f"awsui shell: error: {exc}"
+        message = text("cli_command_error", command="shell", detail=exc)
         CliConsole(sys.stderr).print(
             render_failure_rich(
-                "Shell could not start",
+                text("cli_shell_start_failed"),
                 str(exc),
-                next_step="Set SHELL to an installed executable and retry.",
+                next_step=text("cli_set_shell"),
             ),
             plain=message,
         )
@@ -563,9 +696,9 @@ def _run_context_shell(environment: str) -> int:
 
 def _not_started_message(command_name: str) -> str | None:
     if command_name == "run":
-        return "Command was not started."
+        return text("cli_command_not_started")
     if command_name == "shell":
-        return "Shell was not started."
+        return text("cli_shell_not_started")
     return None
 
 
@@ -574,15 +707,15 @@ def _resolution_next_step(
     environment: str,
 ) -> str:
     if isinstance(error, BindingNotFoundError):
-        return f"Run `awsui bind {environment}`."
+        return text("cli_rebind", environment=environment)
     if isinstance(error, EnvironmentNotFoundError):
         available = ", ".join(error.available_environments)
-        return f"Choose a configured environment: {available}."
+        return text("cli_choose_environment", environments=available)
     if isinstance(error, ContextSourceError):
         if (
             error.source == "project configuration"
             and ".awsui.yaml was not found" in str(error)
         ):
-            return "Run `awsui init` from the project root."
-        return "Run `awsui doctor` and fix the reported configuration issue."
-    return "Run `awsui doctor` for local configuration diagnostics."
+            return text("cli_run_init")
+        return text("cli_run_doctor")
+    return text("cli_local_diagnostics")
