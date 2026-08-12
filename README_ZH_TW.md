@@ -53,7 +53,7 @@ context 中啟動工具。
 
 ### 開始之前
 
-請先準備 Python 3.13、[AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)，
+請先準備 Python 3.11–3.14、[AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)，
 以及一個已透過 AWS CLI 設定完成的 AWS profile。認證方式建議優先使用 IAM
 Identity Center（SSO）。
 
@@ -62,7 +62,7 @@ Identity Center（SSO）。
 建議使用 [uv](https://docs.astral.sh/uv/) 以隔離環境安裝：
 
 ```bash
-uv tool install --python 3.13 awsui
+uv tool install awsui
 ```
 
 也可以使用 pip 安裝到目前的 Python 環境：

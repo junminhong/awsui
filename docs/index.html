@@ -94,10 +94,10 @@
             ],
             "programmingLanguage": {
               "@type": "ComputerLanguage",
-              "name": "Python 3.13",
+              "name": "Python 3.11–3.14",
               "url": "https://www.python.org/"
             },
-            "runtimePlatform": ["Python 3.13", "AWS CLI v2"],
+            "runtimePlatform": ["Python 3.11–3.14", "AWS CLI v2"],
             "license": "https://opensource.org/licenses/MIT",
             "author": {
               "@id": "https://junminhong.github.io/awsui/#author"
@@ -534,7 +534,7 @@
                 </button>
               </div>
               <pre id="installCommands"><code><span class="code-comment"># Install as an isolated tool</span>
-uv tool install --python 3.13 awsui
+uv tool install awsui
 
 <span class="code-comment"># Initialize this AWS project</span>
 cd payment-service
@@ -579,7 +579,7 @@ contexts:
           </div>
 
           <div class="requirement-strip reveal">
-            <div><span>Python</span><strong>3.13</strong></div>
+            <div><span>Python</span><strong>3.11–3.14</strong></div>
             <div><span>AWS CLI</span><strong>v2 required</strong></div>
             <div><span>Credentials</span><strong>Managed by AWS CLI</strong></div>
             <div><span>License</span><strong>MIT</strong></div>
@@ -647,7 +647,7 @@ contexts:
                 <p>
                   Any child process can run inside a verified context, including Codex,
                   Claude Code, Kiro, Antigravity, Terraform, and AWS CLI. awsui supports
-                  macOS, Linux, and Windows wherever Python 3.13 and AWS CLI v2 are available.
+                  macOS, Linux, and Windows wherever Python 3.11–3.14 and AWS CLI v2 are available.
                 </p>
               </div>
             </details>
