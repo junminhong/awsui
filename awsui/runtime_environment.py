@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 
-from .context_engine import ResolvedContext
+from .context.resolution import ResolvedContext
 
 
 _CREDENTIAL_ENVIRONMENT_VARIABLES = frozenset(

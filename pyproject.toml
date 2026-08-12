@@ -35,7 +35,7 @@ Repository = "https://github.com/junminhong/awsui"
 "Bug Tracker" = "https://github.com/junminhong/awsui/issues"
 
 [project.scripts]
-awsui = "awsui.cli:main"
+awsui = "awsui.cli.main:main"
 
 [build-system]
 requires = ["hatchling"]
