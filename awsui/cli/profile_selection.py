@@ -5,24 +5,24 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TextIO
 
-from .aws_cli import AwsCliInfo
-from .cli_console import CliConsole, safe_text
-from .interactive import InputClosedError, read_line
-from .i18n import text
-from .interactive_selector import (
+from ..aws_cli import AwsCliInfo
+from .console import CliConsole, safe_text
+from .prompts import InputClosedError, read_line
+from ..i18n import text
+from .selector import (
     SelectionOption,
     SelectorInputClosed,
     select_option,
     supports_arrow_selection,
 )
-from .models import Profile
-from .profile_catalog import (
+from ..profiles.models import Profile
+from ..profiles.catalog import (
     ProfileCatalog,
     ProfileCatalogError,
     load_profile_catalog,
 )
+from ..profiles.creation import ProfileCommandRunner
 from .profile_creation import (
-    ProfileCommandRunner,
     ProfileCreationCancelled,
     create_profile_interactively,
 )

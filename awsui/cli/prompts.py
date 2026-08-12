@@ -2,8 +2,8 @@
 
 from typing import TextIO
 
-from .cli_console import CliConsole
-from .i18n import text
+from .console import CliConsole
+from ..i18n import text
 
 
 class InputClosedError(Exception):

@@ -10,17 +10,17 @@ from rich.style import StyleType
 from rich.table import Table
 from rich.text import Text
 
-from .bind_command import BindResult
-from .cli_console import safe_text
-from .context_verification import (
+from .bind import BindResult
+from .console import safe_text
+from ..context.verification import (
     AccountMismatchError,
     VerifiedContext,
     describe_principal,
 )
-from .doctor_command import DoctorReport
-from .i18n import text
-from .init_command import InitResult
-from .tui_context import ContextStatus, DashboardSnapshot
+from ..doctor import DoctorReport
+from ..i18n import text
+from ..project.initialization import InitResult
+from ..context.dashboard import ContextStatus, DashboardSnapshot
 
 
 @dataclass(frozen=True, slots=True)

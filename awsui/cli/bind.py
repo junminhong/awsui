@@ -11,22 +11,22 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from .aws_cli import AwsCliInfo
-from .bindings import (
+from ..aws_cli import AwsCliInfo
+from ..project.bindings import (
     LocalBindingsError,
     load_bindings,
     save_bindings,
 )
-from .cli_console import CliConsole, safe_text
-from .i18n import text
-from .models import Profile
+from .console import CliConsole, safe_text
+from ..i18n import text
+from ..profiles.models import Profile
 from .profile_selection import (
     ProfileSelectionCancelled,
     ProfileWorkflowError,
     select_or_create_profile,
 )
-from .profile_creation import ProfileCommandRunner
-from .project_config import (
+from ..profiles.creation import ProfileCommandRunner
+from ..project.config import (
     ProjectConfigError,
     ProjectContext,
     find_project_config,

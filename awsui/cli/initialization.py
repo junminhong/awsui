@@ -11,22 +11,22 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 
-from .aws_cli import AwsCliInfo
-from .cli_console import CliConsole, safe_text
-from .context_verification import (
+from ..aws_cli import AwsCliInfo
+from .console import CliConsole, safe_text
+from ..context.verification import (
     ContextVerificationError,
     IdentityProvider,
 )
-from .models import Profile
-from .interactive import InputClosedError, prompt_value, prompt_yes_no, read_line
-from .i18n import text
-from .profile_creation import ProfileCommandRunner
+from ..profiles.models import Profile
+from .prompts import InputClosedError, prompt_value, prompt_yes_no, read_line
+from ..i18n import text
+from ..profiles.creation import ProfileCommandRunner
 from .profile_selection import (
     ProfileSelectionCancelled,
     ProfileWorkflowError,
     select_or_create_profile,
 )
-from .project_initialization import (
+from ..project.initialization import (
     InitResult,
     InitializedEnvironment,
     ProjectInitializationError,
