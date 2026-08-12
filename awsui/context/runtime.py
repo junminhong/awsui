@@ -6,10 +6,10 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TextIO
 
-from .context_engine import ResolvedContext, resolve_context
-from .context_verification import IdentityProvider, VerifiedContext, verify_context
-from .profile_authentication import authenticate_profile
-from .runtime_environment import build_aws_environment
+from ..profiles.authentication import authenticate_profile
+from ..runtime_environment import build_aws_environment
+from .resolution import ResolvedContext, resolve_context
+from .verification import IdentityProvider, VerifiedContext, verify_context
 
 
 @dataclass(frozen=True, slots=True)

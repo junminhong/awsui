@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TextIO
 
-from .aws_cli import console_login, get_caller_identity, sso_login
+from ..aws_cli import console_login, get_caller_identity, sso_login
+from .catalog import ProfileCatalog, load_profile_catalog
 from .models import Profile
-from .profile_catalog import ProfileCatalog, load_profile_catalog
 
 
 class ReauthenticationMethod(Enum):

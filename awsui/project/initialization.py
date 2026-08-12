@@ -6,14 +6,15 @@ import os
 from pathlib import Path
 from typing import TextIO
 
-from .bindings import LocalBindingsError, load_bindings, save_bindings
-from .context_verification import (
+from ..context.verification import (
     AuthenticatedIdentity,
     IdentityProvider,
     authenticate_identity,
 )
-from .profile_authentication import authenticate_profile
-from .project_config import (
+from ..profiles.authentication import authenticate_profile
+from ..runtime_environment import build_profile_environment
+from .bindings import LocalBindingsError, load_bindings, save_bindings
+from .config import (
     PROJECT_CONFIG_FILENAME,
     SUPPORTED_PROJECT_CONFIG_VERSION,
     ProjectConfig,
@@ -21,7 +22,6 @@ from .project_config import (
     ProjectContext,
     save_project_config,
 )
-from .runtime_environment import build_profile_environment
 
 
 class ProjectInitializationError(Exception):

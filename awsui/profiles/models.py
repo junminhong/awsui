@@ -1,4 +1,4 @@
-"""Shared data models."""
+"""Shared AWS profile data models."""
 
 from typing import Literal, NotRequired, TypedDict
 

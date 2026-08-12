@@ -4,12 +4,12 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 import re
 
-from .context_engine import ResolvedContext
-from .profile_authentication import (
+from ..profiles.authentication import (
     ProfileAuthenticationError,
     authenticate_profile,
 )
-from .profile_catalog import ProfileCatalogError
+from ..profiles.catalog import ProfileCatalogError
+from .resolution import ResolvedContext
 
 
 _ACCOUNT_ID_PATTERN = re.compile(r"[0-9]{12}", re.ASCII)

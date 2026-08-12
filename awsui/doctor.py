@@ -5,12 +5,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .aws_cli import check_aws_cli_available
-from .bindings import LocalBindingsError, load_bindings
+from .project.bindings import LocalBindingsError, load_bindings
 from .i18n import text
-from .config import parse_profiles
-from .models import Profile
-from .profile_catalog import ProfileCatalogError, load_profile_catalog
-from .project_config import (
+from .profiles.config import parse_profiles
+from .profiles.models import Profile
+from .profiles.catalog import ProfileCatalogError, load_profile_catalog
+from .project.config import (
     ProjectConfigError,
     ProjectConfigNotFoundError,
     find_project_config,

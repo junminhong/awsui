@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from .bindings import LocalBindingsError, load_bindings
-from .project_config import (
+from ..project.bindings import LocalBindingsError, load_bindings
+from ..project.config import (
     ProjectConfigError,
     find_project_config,
     load_project_config,
