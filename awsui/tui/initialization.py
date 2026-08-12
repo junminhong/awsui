@@ -13,33 +13,35 @@ from rich.text import Text
 from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.worker import Worker, WorkerState, get_current_worker
 from textual.widgets import (
     Button,
     Checkbox,
     Input,
-    LoadingIndicator,
     OptionList,
     RichLog,
     Static,
 )
 from textual.widgets.option_list import Option
 
-from .aws_cli import AwsCliInfo, get_aws_cli_info
-from .context_verification import IdentityProvider
-from .models import Profile
-from .profile_authentication import describe_authentication
-from .profile_catalog import ProfileCatalog, ProfileCatalogError, load_profile_catalog
-from .profile_creation import (
+from ..aws_cli import AwsCliInfo, get_aws_cli_info
+from ..context.verification import IdentityProvider
+from ..profiles.authentication import describe_authentication
+from ..profiles.catalog import (
+    ProfileCatalog,
+    ProfileCatalogError,
+    load_profile_catalog,
+)
+from ..profiles.creation import (
     ProfileCommandRunner,
     ProfileCreationCommandCancelled,
     ProfileCreationError,
     ProfileCreationMethod,
     create_profile,
 )
-from .project_initialization import (
+from ..profiles.models import Profile
+from ..project.initialization import (
     InitResult,
     InitializedEnvironment,
     ProjectBindingsWriteError,
@@ -48,7 +50,9 @@ from .project_initialization import (
     resolve_initialization_target,
     verify_initialization_environment,
 )
-from .tui_theme import TUI_RICH_STYLES
+from .init_views import compose_initialization_view
+from .styles import INITIALIZATION_CSS
+from .theme import TUI_RICH_STYLES
 
 
 class InitWizardStep(Enum):
@@ -97,103 +101,7 @@ class _AuthenticationOutput(TextIOBase):
 class InitializationScreen(Screen[InitScreenOutcome | None]):
     """Full-screen, keyboard-first project initialization workflow."""
 
-    CSS = """
-    InitializationScreen {
-        layout: vertical;
-        background: $background;
-        color: $text;
-    }
-    #init-header {
-        height: 3;
-        padding: 0 2;
-        align-vertical: middle;
-        border-bottom: solid $border;
-        background: $background;
-    }
-    #init-brand {
-        width: auto;
-        margin-right: 2;
-        color: $text;
-        text-style: bold;
-    }
-    #init-heading { width: 1fr; color: $text; text-style: bold; }
-    #init-path { width: auto; color: $text-muted; }
-    #init-progress {
-        height: 2;
-        padding: 0 2;
-        color: $text-muted;
-        background: $surface;
-        border-bottom: solid $border;
-    }
-    #init-scroll { height: 1fr; }
-    .init-step {
-        width: 1fr;
-        height: auto;
-        margin: 2 4;
-        padding: 1 2;
-        background: $surface;
-        border: solid $border;
-    }
-    .init-title { height: 2; color: $text; text-style: bold; }
-    .init-help { height: auto; margin-bottom: 1; color: $text-muted; }
-    .init-label { height: 1; margin-top: 1; color: $text-muted; }
-    .init-error { height: auto; margin-top: 1; color: $text-error; }
-    .init-actions {
-        height: 3;
-        margin-top: 1;
-        align-horizontal: right;
-        align-vertical: middle;
-    }
-    .init-actions Button, .init-inline-actions Button {
-        width: auto;
-        min-width: 9;
-        height: 1;
-        margin-left: 1;
-        padding: 0 1;
-        border: none;
-        background: transparent;
-        color: $text-muted;
-    }
-    .init-actions Button:hover, .init-actions Button:focus,
-    .init-inline-actions Button:hover, .init-inline-actions Button:focus {
-        background: $panel;
-        color: $text;
-    }
-    .init-primary { color: $text-primary; }
-    .init-primary:hover, .init-primary:focus { background: $primary-muted; }
-    .init-danger { color: $text-error; }
-    .init-inline-actions { height: 3; align-horizontal: right; }
-    #init-profile-list, #init-method-list, #init-review-list {
-        height: 9;
-        margin-top: 1;
-        border: solid $border;
-        background: $background;
-    }
-    #init-profile-list:focus, #init-method-list:focus, #init-review-list:focus,
-    InitializationScreen Input:focus {
-        border: tall $primary;
-    }
-    InitializationScreen Input { margin-bottom: 1; }
-    #init-protected { margin: 1 0; }
-    #init-auth-spinner { height: 3; color: $text-primary; }
-    #init-auth-status { height: auto; margin-bottom: 1; color: $text; }
-    #init-auth-log {
-        height: 10;
-        padding: 0 1;
-        border: solid $border;
-        background: $background;
-        color: $text-muted;
-    }
-    #init-review-detail {
-        height: auto;
-        min-height: 6;
-        margin-top: 1;
-        padding: 1;
-        background: $background;
-        color: $text;
-    }
-    #init-access-warning { height: auto; margin-top: 1; color: $text-warning; }
-    """
+    CSS = INITIALIZATION_CSS
 
     BINDINGS = [
         Binding("escape", "back", "Back"),
@@ -238,169 +146,11 @@ class InitializationScreen(Screen[InitScreenOutcome | None]):
         return self.translations[key].format(**values)
 
     def compose(self) -> ComposeResult:
-        with Horizontal(id="init-header"):
-            yield Static("awsui", id="init-brand")
-            yield Static(self._text("init_title"), id="init-heading")
-            yield Static(str(self.target.directory), id="init-path")
-        yield Static(id="init-progress")
-        with VerticalScroll(id="init-scroll"):
-            with Vertical(id="init-project-step", classes="init-step"):
-                yield Static(self._text("init_project_title"), classes="init-title")
-                yield Static(self._text("init_project_help"), classes="init-help")
-                yield Static(self._text("init_project_label"), classes="init-label")
-                yield Input(value=self.project, id="init-project-name")
-                yield Static(id="init-project-error", classes="init-error")
-                with Horizontal(classes="init-actions"):
-                    yield Button(
-                        self._text("action_cancel"),
-                        id="init-cancel",
-                        compact=True,
-                        flat=True,
-                    )
-                    yield Button(
-                        self._text("action_continue"),
-                        id="init-project-next",
-                        classes="init-primary",
-                        compact=True,
-                        flat=True,
-                    )
-
-            with Vertical(id="init-context-step", classes="init-step"):
-                yield Static(self._text("init_context_title"), classes="init-title")
-                yield Static(self._text("init_context_help"), classes="init-help")
-                yield Static(self._text("init_environment_label"), classes="init-label")
-                yield Input(
-                    placeholder=self._text("init_environment_placeholder"),
-                    id="init-environment-name",
-                )
-                yield Static(self._text("init_profile_label"), classes="init-label")
-                yield OptionList(id="init-profile-list", markup=False)
-                with Horizontal(classes="init-inline-actions"):
-                    yield Button(
-                        self._text("action_refresh_profiles"),
-                        id="init-profile-refresh",
-                        compact=True,
-                        flat=True,
-                    )
-                    yield Button(
-                        self._text("action_create_profile"),
-                        id="init-profile-create",
-                        classes="init-primary",
-                        compact=True,
-                        flat=True,
-                    )
-                yield Static(self._text("field_region"), classes="init-label")
-                yield Input(id="init-region")
-                yield Checkbox(
-                    self._text("init_protected_label"),
-                    id="init-protected",
-                    compact=True,
-                )
-                yield Static(id="init-context-error", classes="init-error")
-                with Horizontal(classes="init-actions"):
-                    yield Button(
-                        self._text("action_back"),
-                        id="init-context-back",
-                        compact=True,
-                        flat=True,
-                    )
-                    yield Button(
-                        self._text("action_verify_add"),
-                        id="init-verify",
-                        classes="init-primary",
-                        compact=True,
-                        flat=True,
-                    )
-
-            with Vertical(id="init-create-step", classes="init-step"):
-                yield Static(
-                    self._text("init_create_profile_title"), classes="init-title"
-                )
-                yield Static(
-                    self._text("init_create_profile_help"), classes="init-help"
-                )
-                yield OptionList(id="init-method-list", markup=False)
-                yield Static(
-                    self._text("init_profile_name_label"), classes="init-label"
-                )
-                yield Input(id="init-new-profile-name")
-                yield Static(
-                    self._text("init_access_key_warning"),
-                    id="init-access-warning",
-                )
-                yield Static(id="init-create-error", classes="init-error")
-                with Horizontal(classes="init-actions"):
-                    yield Button(
-                        self._text("action_back"),
-                        id="init-create-back",
-                        compact=True,
-                        flat=True,
-                    )
-                    yield Button(
-                        self._text("action_open_aws_cli"),
-                        id="init-create-start",
-                        classes="init-primary",
-                        compact=True,
-                        flat=True,
-                    )
-
-            with Vertical(id="init-verifying-step", classes="init-step"):
-                yield Static(self._text("init_verify_title"), classes="init-title")
-                yield LoadingIndicator(id="init-auth-spinner")
-                yield Static(self._text("authenticating"), id="init-auth-status")
-                yield RichLog(
-                    max_lines=40,
-                    wrap=True,
-                    markup=False,
-                    id="init-auth-log",
-                )
-                with Horizontal(classes="init-actions"):
-                    yield Button(
-                        self._text("action_cancel_verification"),
-                        id="init-verification-cancel",
-                        compact=True,
-                        flat=True,
-                    )
-
-            with Vertical(id="init-review-step", classes="init-step"):
-                yield Static(self._text("init_review_title"), classes="init-title")
-                yield Static(self._text("init_review_help"), classes="init-help")
-                yield OptionList(id="init-review-list", markup=False)
-                yield Static(id="init-review-detail")
-                yield Static(id="init-review-error", classes="init-error")
-                with Horizontal(classes="init-actions"):
-                    yield Button(
-                        self._text("action_cancel"),
-                        id="init-review-cancel",
-                        classes="init-danger",
-                        compact=True,
-                        flat=True,
-                    )
-                    yield Button(
-                        self._text("action_remove"),
-                        id="init-review-remove",
-                        compact=True,
-                        flat=True,
-                    )
-                    yield Button(
-                        self._text("action_edit"),
-                        id="init-review-edit",
-                        compact=True,
-                        flat=True,
-                    )
-                    yield Button(
-                        self._text("action_add_environment"),
-                        id="init-review-add",
-                        compact=True,
-                        flat=True,
-                    )
-                    yield Button(
-                        self._text("action_create_project"),
-                        id="init-finish",
-                        classes="init-primary",
-                        compact=True,
-                        flat=True,
-                    )
+        return compose_initialization_view(
+            project=self.project,
+            target_directory=self.target.directory,
+            text=self._text,
+        )
 
     def on_mount(self) -> None:
         self._load_profiles()

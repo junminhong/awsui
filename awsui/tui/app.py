@@ -1,6 +1,6 @@
 """Project-aware Textual dashboard for verified AWS contexts."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from datetime import datetime
 import os
 from pathlib import Path
@@ -12,68 +12,53 @@ from rich.table import Table
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, HorizontalScroll, Vertical, VerticalScroll
-from textual.screen import ModalScreen
-from textual.widgets import (
-    Button,
-    Input,
-    ListItem,
-    ListView,
-    Select,
-    Static,
-)
+from textual.containers import Horizontal, HorizontalScroll, Vertical
+from textual.widgets import Button, ListView, Static
 
-from .bind_command import BindCommandCancelled, BindCommandError, bind_environment
-from .bindings import LocalBindingsError
-from .cli_console import CliConsole, safe_text
-from .cli_presenter import (
+from ..cli.bind import BindCommandCancelled, BindCommandError, bind_environment
+from ..cli.console import CliConsole, safe_text
+from ..cli.presenter import (
     DoctorRenderStyles,
     render_doctor_report_rich,
     render_launch_context,
     render_launch_context_rich,
     render_status_rich,
 )
-from .command_runner import CommandLaunchError, run_command, select_interactive_shell
-from .context_engine import ContextResolutionError
-from .context_runtime import VerifiedRuntime, prepare_context_runtime
-from .context_verification import (
+from ..command_runner import CommandLaunchError, run_command, select_interactive_shell
+from ..context.dashboard import (
+    ContextItem,
+    ContextStatus,
+    DashboardSnapshot,
+    load_dashboard,
+)
+from ..context.resolution import ContextResolutionError
+from ..context.runtime import VerifiedRuntime, prepare_context_runtime
+from ..context.verification import (
     AccountMismatchError,
     ContextVerificationError,
     VerifiedContext,
     describe_principal,
 )
-from .doctor_command import diagnose
-from .i18n import LANG_EN, LANG_ZH_TW
-from .init_screen import InitializationScreen, InitScreenOutcome
-from .logging import get_logger
-from .profile_catalog import ProfileCatalogError
-from .project_config import (
+from ..doctor import diagnose
+from ..i18n import LANG_EN, LANG_ZH_TW
+from ..logging import get_logger
+from ..profiles.catalog import ProfileCatalogError
+from ..project.bindings import LocalBindingsError
+from ..project.config import (
     ProjectConfigError,
     ProjectConfigNotFoundError,
 )
-from .project_initialization import ProjectInitializationError
-from .tui_context import (
-    ContextItem,
-    ContextStatus,
-    DashboardSnapshot,
-    DetectedTool,
+from ..project.initialization import ProjectInitializationError
+from .initialization import InitializationScreen, InitScreenOutcome
+from .launch import (
     LaunchCommandError,
     detect_tools,
-    load_dashboard,
     parse_launch_command,
 )
-from .tui_theme import AWSUI_GRAPHITE_THEME, TUI_RICH_STYLES
-
-
-_STATUS_PRESENTATION = {
-    ContextStatus.UNBOUND: ("!", "status_unbound", "warning"),
-    ContextStatus.PROFILE_MISSING: ("!", "status_profile_missing", "error"),
-    ContextStatus.READY: ("○", "status_ready", "primary"),
-    ContextStatus.VERIFYING: ("◌", "status_verifying", "primary"),
-    ContextStatus.VERIFIED: ("✓", "status_verified", "success"),
-    ContextStatus.MISMATCH: ("✗", "status_mismatch", "error"),
-    ContextStatus.ERROR: ("✗", "status_error", "error"),
-}
+from .screens import InformationScreen, LaunchScreen
+from .styles import DASHBOARD_CSS
+from .theme import AWSUI_GRAPHITE_THEME, TUI_RICH_STYLES
+from .widgets import ContextList, STATUS_PRESENTATION
 
 _TUI_DOCTOR_STYLES = DoctorRenderStyles(
     value=TUI_RICH_STYLES.value,
@@ -87,357 +72,11 @@ _TUI_DOCTOR_STYLES = DoctorRenderStyles(
 )
 
 
-class ContextList(ListView):
-    """Environment list whose labels reflect session verification state."""
-
-    def set_contexts(
-        self,
-        contexts: Sequence[ContextItem],
-        statuses: Mapping[str, ContextStatus],
-        translations: Mapping[str, str],
-    ) -> None:
-        renderables = [
-            self._render_context(
-                context,
-                statuses.get(context.name, context.status),
-                translations,
-            )
-            for context in contexts
-        ]
-        existing_items = list(self.children)
-        existing_names = [item.name for item in existing_items]
-        expected_names = [context.name for context in contexts]
-        if existing_names == expected_names:
-            for item, renderable in zip(existing_items, renderables, strict=True):
-                item.query_one(Static).update(renderable)
-            return
-
-        self.clear()
-        for context, renderable in zip(contexts, renderables, strict=True):
-            self.append(ListItem(Static(renderable), name=context.name))
-
-    @staticmethod
-    def _render_context(
-        context: ContextItem,
-        status: ContextStatus,
-        translations: Mapping[str, str],
-    ) -> Text:
-        """Render one environment row without changing ListView selection."""
-        symbol, label_key, style_name = _STATUS_PRESENTATION[status]
-        status_style = getattr(TUI_RICH_STYLES, style_name)
-        label = translations[label_key]
-        body = Text()
-        body.append(f"{symbol} ", style=status_style)
-        body.append(context.name.upper(), style=TUI_RICH_STYLES.title)
-        if context.protected:
-            body.append(
-                f" · {translations['protected']}",
-                style=TUI_RICH_STYLES.protected,
-            )
-        body.append("\n")
-        body.append(label, style=status_style)
-        if context.profile:
-            body.append(f" · {context.profile}", style=TUI_RICH_STYLES.muted)
-        return body
-
-
-class InformationScreen(ModalScreen[None]):
-    """Simple modal for Doctor and keyboard help renderables."""
-
-    CSS = """
-    InformationScreen {
-        align: center middle;
-        background: $background 88%;
-    }
-    #information-card {
-        width: 80;
-        max-width: 92%;
-        height: auto;
-        max-height: 82%;
-        padding: 1 2;
-        border: solid $border;
-        background: $surface;
-    }
-    #information-title {
-        height: 2;
-        color: $text;
-        text-style: bold;
-    }
-    #information-scroll { height: auto; max-height: 24; }
-    #information-content { height: auto; color: $text; }
-    #information-actions {
-        height: 2;
-        margin-top: 1;
-        align-horizontal: right;
-    }
-    #information-close {
-        width: auto;
-        min-width: 9;
-        height: 1;
-        padding: 0 1;
-        border: none;
-        background: $panel;
-        color: $text-muted;
-    }
-    #information-close:hover, #information-close:focus {
-        background: $primary-muted;
-        color: $text;
-    }
-    """
-
-    BINDINGS = [
-        Binding("escape", "close", "Close"),
-        Binding("q", "close", "Close"),
-    ]
-
-    def __init__(
-        self,
-        title: str,
-        renderable: RenderableType,
-        *,
-        close_label: str,
-    ) -> None:
-        super().__init__()
-        self.modal_title = title
-        self.renderable = renderable
-        self.close_label = close_label
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="information-card"):
-            yield Static(self.modal_title, id="information-title")
-            with VerticalScroll(id="information-scroll"):
-                yield Static(self.renderable, id="information-content")
-            with Horizontal(id="information-actions"):
-                yield Button(
-                    self.close_label,
-                    id="information-close",
-                    compact=True,
-                    flat=True,
-                )
-
-    def action_close(self) -> None:
-        self.dismiss()
-
-    def on_button_pressed(self, _event: Button.Pressed) -> None:
-        self.dismiss()
-
-
-class LaunchScreen(ModalScreen[str | None]):
-    """Detected-tool selector plus editable direct-argv command input."""
-
-    CSS = """
-    LaunchScreen {
-        align: center middle;
-        background: $background 88%;
-    }
-    #launch-card {
-        width: 76;
-        max-width: 92%;
-        height: auto;
-        padding: 1 2;
-        border: solid $border;
-        background: $surface;
-    }
-    #launch-title { text-style: bold; color: $text; margin-bottom: 1; }
-    #launch-warning { color: $text-warning; margin-bottom: 1; }
-    #launch-tools, #launch-command { margin-bottom: 1; }
-    #launch-tools:focus, #launch-command:focus { border: tall $primary; }
-    #launch-actions { height: auto; align-horizontal: right; }
-    #launch-actions Button {
-        width: auto;
-        min-width: 9;
-        height: 1;
-        margin-left: 1;
-        padding: 0 1;
-        border: none;
-        background: transparent;
-        color: $text-muted;
-    }
-    #launch-actions Button:hover, #launch-actions Button:focus {
-        background: $panel;
-        color: $text;
-    }
-    #launch-confirm { color: $text-primary; }
-    #launch-confirm:hover, #launch-confirm:focus { background: $primary-muted; }
-    """
-
-    BINDINGS = [Binding("escape", "cancel", "Cancel")]
-
-    def __init__(
-        self,
-        environment: str,
-        tools: Sequence[DetectedTool],
-        *,
-        protected: bool,
-        translations: Mapping[str, str] = LANG_EN,
-    ) -> None:
-        super().__init__()
-        self.environment = environment
-        self.tools = tuple(tools)
-        self.protected = protected
-        self.translations = translations
-
-    def compose(self) -> ComposeResult:
-        options = [(tool.label, tool.executable) for tool in self.tools]
-        options.append((self.translations["launch_custom"], ""))
-        initial = self.tools[0].executable if self.tools else ""
-        with Vertical(id="launch-card"):
-            yield Static(
-                self.translations["launch_title"].format(
-                    environment=self.environment.upper()
-                ),
-                id="launch-title",
-            )
-            warning = Static(
-                self.translations["launch_warning"],
-                id="launch-warning",
-            )
-            warning.display = self.protected
-            yield warning
-            yield Select(
-                options,
-                value=initial,
-                allow_blank=False,
-                compact=True,
-                id="launch-tools",
-            )
-            yield Input(
-                value=initial,
-                placeholder=self.translations["launch_placeholder"],
-                id="launch-command",
-            )
-            with Horizontal(id="launch-actions"):
-                yield Button(
-                    self.translations["action_cancel"],
-                    id="launch-cancel",
-                    compact=True,
-                    flat=True,
-                )
-                yield Button(
-                    self.translations["action_verify_launch"],
-                    id="launch-confirm",
-                    compact=True,
-                    flat=True,
-                )
-
-    def on_mount(self) -> None:
-        self.query_one("#launch-command", Input).focus()
-
-    def on_select_changed(self, event: Select.Changed) -> None:
-        if isinstance(event.value, str):
-            command = self.query_one("#launch-command", Input)
-            command.value = event.value
-            command.cursor_position = len(event.value)
-            command.focus()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        self.dismiss(event.value.strip() or None)
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "launch-cancel":
-            self.dismiss(None)
-            return
-        command = self.query_one("#launch-command", Input).value.strip()
-        self.dismiss(command or None)
-
-    def action_cancel(self) -> None:
-        self.dismiss(None)
-
-
 class AWSUIApp(App[None]):
     """Keyboard-first dashboard for project AWS environments."""
 
     TITLE = "awsui"
-    CSS = """
-    Screen {
-        layout: vertical;
-        background: $background;
-        color: $text;
-    }
-    #top-bar {
-        height: 3;
-        padding: 0 2;
-        align-vertical: middle;
-        background: $background;
-        border-bottom: solid $border;
-    }
-    #brand {
-        width: auto;
-        color: $text;
-        text-style: bold;
-        margin-right: 2;
-    }
-    #breadcrumb { width: 1fr; color: $text-muted; }
-    #product-label { width: auto; color: $text-muted; }
-    #dashboard { height: 1fr; layout: horizontal; }
-    #context-pane {
-        width: 34%;
-        min-width: 26;
-        max-width: 46;
-        padding: 1 1 0 1;
-        border-right: solid $border;
-        background: $background;
-    }
-    #environment-heading {
-        height: 2;
-        margin: 0 1;
-        color: $text-muted;
-        text-style: bold;
-    }
-    #context-list {
-        height: 1fr;
-        border: none;
-        background: $background;
-    }
-    #context-list > ListItem {
-        height: 3;
-        padding: 0 1;
-        border-left: thick transparent;
-        background: transparent;
-    }
-    #context-list > ListItem.-highlight {
-        border-left: thick $primary;
-        background: $panel;
-        color: $text;
-    }
-    #detail-pane {
-        width: 1fr;
-        padding: 1 2;
-        background: $background;
-    }
-    #detail-content {
-        height: 1fr;
-        padding: 2 3;
-        background: $surface;
-    }
-    #action-bar {
-        height: 2;
-        padding: 0 1;
-        align-vertical: middle;
-        background: $surface;
-        border-top: solid $border;
-        scrollbar-size: 0 0;
-    }
-    #action-bar Button {
-        width: auto;
-        min-width: 0;
-        height: 1;
-        padding: 0 1;
-        border: none;
-        background: transparent;
-        color: $text-muted;
-        text-style: none;
-    }
-    #action-bar Button:hover, #action-bar Button:focus {
-        background: $panel;
-        color: $text;
-    }
-    #verify, #launch { color: $text-primary; }
-    #initialize { color: $text-primary; }
-    #action-bar Button:disabled {
-        display: none;
-    }
-    """
+    CSS = DASHBOARD_CSS
 
     BINDINGS = [
         Binding("v", "verify_context", "Verify", show=True),
@@ -627,7 +266,7 @@ class AWSUIApp(App[None]):
             return
 
         status = self.statuses.get(item.name, item.status)
-        symbol, label_key, style_name = _STATUS_PRESENTATION[status]
+        symbol, label_key, style_name = STATUS_PRESENTATION[status]
         status_style = getattr(TUI_RICH_STYLES, style_name)
         label = self._text(label_key)
         grid = Table.grid(padding=(0, 2))
@@ -1056,14 +695,3 @@ def run_tui(
 ) -> None:
     """Create and run the project Context Dashboard."""
     AWSUIApp(lang=lang, log_level=log_level).run()
-
-
-def main() -> int:
-    """Preserve the historical ``python -m awsui.app`` entry point."""
-    from .cli import main as cli_main
-
-    return cli_main()
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
