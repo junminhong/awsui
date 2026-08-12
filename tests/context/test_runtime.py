@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
-from awsui.context_engine import ResolvedContext
-from awsui.context_runtime import VerifiedRuntime, prepare_context_runtime
+from awsui.context.resolution import ResolvedContext
+from awsui.context.runtime import VerifiedRuntime, prepare_context_runtime
 
 
 def resolved_context() -> ResolvedContext:
@@ -24,8 +24,8 @@ def resolved_context() -> ResolvedContext:
 
 
 class TestPrepareContextRuntime:
-    @patch("awsui.context_runtime.authenticate_profile")
-    @patch("awsui.context_runtime.resolve_context")
+    @patch("awsui.context.runtime.authenticate_profile")
+    @patch("awsui.context.runtime.resolve_context")
     def test_uses_same_sanitized_environment_for_authentication(
         self,
         mock_resolve,
@@ -64,7 +64,7 @@ class TestPrepareContextRuntime:
         assert authentication_environment == dict(runtime.environment)
         assert mock_authenticate.call_args.kwargs["login_output"] is None
 
-    @patch("awsui.context_runtime.resolve_context")
+    @patch("awsui.context.runtime.resolve_context")
     def test_injected_identity_provider_is_used(self, mock_resolve):
         mock_resolve.return_value = resolved_context()
         calls: list[str] = []
@@ -82,7 +82,7 @@ class TestPrepareContextRuntime:
         assert runtime.verified.actual_account == "999999999999"
         assert calls == ["company-prod"]
 
-    @patch("awsui.context_runtime.resolve_context")
+    @patch("awsui.context.runtime.resolve_context")
     def test_runtime_environment_is_immutable(self, mock_resolve):
         mock_resolve.return_value = resolved_context()
         runtime = prepare_context_runtime(

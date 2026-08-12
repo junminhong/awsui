@@ -4,9 +4,9 @@ from unittest.mock import patch
 
 import pytest
 
-from awsui.bindings import LocalBindingsWriteError, load_bindings
-from awsui.project_config import load_project_config
-from awsui.project_initialization import (
+from awsui.project.bindings import LocalBindingsWriteError, load_bindings
+from awsui.project.config import load_project_config
+from awsui.project.initialization import (
     InitializedEnvironment,
     ProjectBindingsWriteError,
     ProjectInitializationError,
@@ -38,7 +38,7 @@ def test_verification_uses_sanitized_profile_environment(tmp_path):
         }
 
     with patch(
-        "awsui.project_initialization.authenticate_profile",
+        "awsui.project.initialization.authenticate_profile",
         side_effect=authenticate,
     ):
         verified = verify_initialization_environment(
@@ -111,7 +111,7 @@ def test_bindings_failure_reports_recoverable_shared_config(tmp_path):
     error = LocalBindingsWriteError(bindings_path, "disk full")
 
     with (
-        patch("awsui.project_initialization.save_bindings", side_effect=error),
+        patch("awsui.project.initialization.save_bindings", side_effect=error),
         pytest.raises(ProjectBindingsWriteError) as raised,
     ):
         commit_project_initialization(

@@ -5,7 +5,7 @@ from types import MappingProxyType
 
 import pytest
 
-from awsui.context_engine import ResolvedContext
+from awsui.context.resolution import ResolvedContext
 from awsui.runtime_environment import build_aws_environment
 
 

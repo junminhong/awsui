@@ -7,10 +7,10 @@ from unittest.mock import Mock, patch
 from rich.panel import Panel
 
 from awsui.aws_cli import AwsCliInfo
-from awsui.bind_command import BindResult
-from awsui.cli import main
-from awsui.cli_console import CliConsole, safe_text
-from awsui.cli_presenter import (
+from awsui.cli.bind import BindResult
+from awsui.cli.console import CliConsole, safe_text
+from awsui.cli.main import main
+from awsui.cli.presenter import (
     render_account_mismatch_rich,
     render_bind_result_rich,
     render_doctor_report,
@@ -20,23 +20,23 @@ from awsui.cli_presenter import (
     render_launch_context_rich,
     render_verified_context_rich,
 )
-from awsui.context_engine import ResolvedContext
-from awsui.context_runtime import VerifiedRuntime
-from awsui.context_verification import AccountMismatchError, VerifiedContext
-from awsui.doctor_command import DoctorCheck, DoctorReport
-from awsui.init_command import InitResult, InitializedEnvironment
-from awsui.profile_catalog import ProfileCatalog
-from awsui.profile_creation import (
-    ProfileCreationMethod,
+from awsui.cli.profile_creation import (
     _select_creation_method,
     create_profile_interactively,
 )
-from awsui.profile_selection import (
+from awsui.cli.profile_selection import (
     ProfileChoice,
     ProfileChoiceKind,
     select_or_create_profile,
 )
-from awsui.tui_context import ContextItem, ContextStatus, DashboardSnapshot
+from awsui.context.dashboard import ContextItem, ContextStatus, DashboardSnapshot
+from awsui.context.resolution import ResolvedContext
+from awsui.context.runtime import VerifiedRuntime
+from awsui.context.verification import AccountMismatchError, VerifiedContext
+from awsui.doctor import DoctorCheck, DoctorReport
+from awsui.profiles.catalog import ProfileCatalog
+from awsui.profiles.creation import ProfileCreationMethod
+from awsui.project.initialization import InitResult, InitializedEnvironment
 
 
 class TerminalBuffer(StringIO):
@@ -160,7 +160,7 @@ def test_context_list_rich_renders_table_without_authentication():
     assert "UNBOUND" in output
 
 
-@patch("awsui.profile_selection.select_option")
+@patch("awsui.cli.profile_selection.select_option")
 def test_profile_selection_uses_arrow_selector_with_current_default(
     mock_select,
     monkeypatch,
@@ -220,7 +220,7 @@ def test_access_key_workflow_renders_warning_without_running_command():
     assert "Long-term access keys are not recommended" in output.getvalue()
 
 
-@patch("awsui.profile_creation.select_option")
+@patch("awsui.cli.profile_creation.select_option")
 def test_authentication_method_uses_arrow_selector_and_defaults_to_sso(
     mock_select,
 ):
@@ -246,7 +246,7 @@ def test_authentication_method_uses_arrow_selector_and_defaults_to_sso(
     assert call.kwargs["default"] is ProfileCreationMethod.SSO
 
 
-@patch("awsui.profile_creation.select_option")
+@patch("awsui.cli.profile_creation.select_option")
 def test_authentication_selector_disables_console_login_on_old_cli(mock_select):
     mock_select.return_value = ProfileCreationMethod.SSO
 
@@ -326,8 +326,8 @@ def test_verified_card_shows_role_only_from_sts_principal_arn():
     assert "session-name" not in output
 
 
-@patch("awsui.cli.prepare_resolved_runtime")
-@patch("awsui.cli.resolve_context")
+@patch("awsui.cli.main.prepare_resolved_runtime")
+@patch("awsui.cli.main.resolve_context")
 def test_human_context_command_uses_rich_on_a_tty(
     mock_resolve,
     mock_prepare,
@@ -352,8 +352,8 @@ def test_human_context_command_uses_rich_on_a_tty(
     assert "Authenticating and verifying" in stderr.getvalue()
 
 
-@patch("awsui.cli.prepare_resolved_runtime")
-@patch("awsui.cli.resolve_context")
+@patch("awsui.cli.main.prepare_resolved_runtime")
+@patch("awsui.cli.main.resolve_context")
 def test_context_json_stays_unstyled_even_when_stdout_is_a_tty(
     mock_resolve,
     mock_prepare,

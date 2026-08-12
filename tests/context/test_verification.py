@@ -6,8 +6,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from awsui.context_engine import ResolvedContext
-from awsui.context_verification import (
+from awsui.context.resolution import ResolvedContext
+from awsui.context.verification import (
     AccountMismatchError,
     AuthenticatedIdentity,
     IdentityUnavailableError,
@@ -16,7 +16,7 @@ from awsui.context_verification import (
     authenticate_identity,
     verify_context,
 )
-from awsui.profile_catalog import ProfileCatalog
+from awsui.profiles.catalog import ProfileCatalog
 
 
 def resolved_context() -> ResolvedContext:
@@ -65,7 +65,7 @@ class TestVerifyContext:
         with pytest.raises(FrozenInstanceError):
             verified.actual_account = "111111111111"  # type: ignore[misc]
 
-    @patch("awsui.context_verification.authenticate_profile")
+    @patch("awsui.context.verification.authenticate_profile")
     def test_uses_default_identity_provider(self, mock_authenticate):
         mock_authenticate.return_value = {"Account": "999999999999"}
 
@@ -74,9 +74,9 @@ class TestVerifyContext:
         assert verified.actual_account == "999999999999"
         mock_authenticate.assert_called_once_with("company-prod")
 
-    @patch("awsui.profile_authentication.sso_login")
-    @patch("awsui.profile_authentication.get_caller_identity")
-    @patch("awsui.profile_authentication.load_profile_catalog")
+    @patch("awsui.profiles.authentication.sso_login")
+    @patch("awsui.profiles.authentication.get_caller_identity")
+    @patch("awsui.profiles.authentication.load_profile_catalog")
     def test_default_provider_retries_after_sso_login(
         self,
         mock_catalog,

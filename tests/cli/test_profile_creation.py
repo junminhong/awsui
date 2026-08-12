@@ -4,8 +4,8 @@ from io import StringIO
 from unittest.mock import Mock
 
 from awsui.aws_cli import AwsCliInfo
-from awsui.profile_catalog import ProfileCatalog
-from awsui.profile_creation import create_profile_interactively
+from awsui.cli.profile_creation import create_profile_interactively
+from awsui.profiles.catalog import ProfileCatalog
 
 
 def profile(name, kind="sso"):

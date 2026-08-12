@@ -1,6 +1,6 @@
 """Tests for Context Dashboard translations."""
 
-import re
+from string import Formatter
 
 from awsui.i18n import LANG_EN, LANG_ZH_TW, text, use_language
 
@@ -11,11 +11,17 @@ def test_languages_have_the_same_nonempty_string_keys():
     assert all(isinstance(value, str) and value for value in LANG_ZH_TW.values())
 
 
+def _format_fields(value: str) -> set[str]:
+    return {
+        field_name
+        for _, field_name, _, _ in Formatter().parse(value)
+        if field_name is not None
+    }
+
+
 def test_format_placeholders_match_between_languages():
     for key, english in LANG_EN.items():
-        assert set(re.findall(r"\{(\w+)\}", english)) == set(
-            re.findall(r"\{(\w+)\}", LANG_ZH_TW[key])
-        )
+        assert _format_fields(english) == _format_fields(LANG_ZH_TW[key]), key
 
 
 def test_dashboard_translations_cover_primary_states_and_actions():

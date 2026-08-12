@@ -7,12 +7,12 @@ from unittest.mock import patch
 import pytest
 
 from awsui.aws_cli import AwsCliInfo
-from awsui.bind_command import (
+from awsui.cli.bind import (
     BindCommandCancelled,
     BindCommandError,
     bind_environment,
 )
-from awsui.bindings import (
+from awsui.project.bindings import (
     LocalBindingsWriteError,
     load_bindings,
     save_bindings,
@@ -156,7 +156,7 @@ class TestBindEnvironment:
         save_bindings(bindings)
         stdout = StringIO()
 
-        with patch("awsui.bind_command.save_bindings") as mock_save:
+        with patch("awsui.cli.bind.save_bindings") as mock_save:
             result = bind_environment(
                 "prod",
                 start_dir=start_dir,
@@ -418,7 +418,7 @@ class TestBindFailures:
         bindings_path = tmp_path / "bindings.json"
 
         with patch(
-            "awsui.bind_command.save_bindings",
+            "awsui.cli.bind.save_bindings",
             side_effect=LocalBindingsWriteError(
                 bindings_path,
                 "write failed",

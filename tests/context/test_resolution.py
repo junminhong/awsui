@@ -6,15 +6,15 @@ from unittest.mock import patch
 
 import pytest
 
-from awsui.bindings import load_bindings, save_bindings
-from awsui.context_engine import (
+from awsui.context.resolution import (
     BindingNotFoundError,
     ContextSourceError,
     EnvironmentNotFoundError,
     ResolvedContext,
     resolve_context,
 )
-from awsui.project_config import (
+from awsui.project.bindings import load_bindings, save_bindings
+from awsui.project.config import (
     ProjectConfigNotFoundError,
     ProjectConfigValidationError,
 )
@@ -181,7 +181,7 @@ class TestResolveContext:
         write_binding(bindings_path)
 
         with (
-            patch("awsui.config.parse_profiles") as mock_profiles,
+            patch("awsui.profiles.config.parse_profiles") as mock_profiles,
             patch("awsui.aws_cli.get_caller_identity") as mock_identity,
             patch("awsui.aws_cli.sso_login") as mock_login,
         ):
@@ -302,7 +302,7 @@ class TestResolutionFailures:
     def test_unknown_environment_does_not_read_bindings(self, tmp_path):
         write_project_config(tmp_path)
 
-        with patch("awsui.context_engine.load_bindings") as mock_load:
+        with patch("awsui.context.resolution.load_bindings") as mock_load:
             with pytest.raises(EnvironmentNotFoundError):
                 resolve_context(
                     "staging",

@@ -6,7 +6,7 @@ from tempfile import NamedTemporaryFile
 
 import pytest
 
-from awsui.config import parse_profiles
+from awsui.profiles.config import parse_profiles
 
 
 @pytest.fixture(autouse=True)

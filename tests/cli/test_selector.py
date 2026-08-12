@@ -12,7 +12,7 @@ from questionary import Choice, Separator
 from prompt_toolkit.layout.containers import Window
 from questionary.prompts.common import InquirerControl
 
-from awsui.interactive_selector import (
+from awsui.cli.selector import (
     SelectionOption,
     SelectorInputClosed,
     select_option,
@@ -40,9 +40,9 @@ def test_arrow_selection_requires_two_terminal_streams(stdin, stdout, expected):
     assert supports_arrow_selection(stdin, stdout) is expected
 
 
-@patch("awsui.interactive_selector.create_output")
-@patch("awsui.interactive_selector.create_input")
-@patch("awsui.interactive_selector.questionary.select")
+@patch("awsui.cli.selector.create_output")
+@patch("awsui.cli.selector.create_input")
+@patch("awsui.cli.selector.questionary.select")
 def test_selector_configures_compact_arrow_only_prompt(
     mock_select,
     mock_create_input,
@@ -96,9 +96,9 @@ def test_selector_configures_compact_arrow_only_prompt(
     terminal_input.close.assert_called_once_with()
 
 
-@patch("awsui.interactive_selector.create_output", return_value=Mock())
-@patch("awsui.interactive_selector.create_input")
-@patch("awsui.interactive_selector.questionary.select")
+@patch("awsui.cli.selector.create_output", return_value=Mock())
+@patch("awsui.cli.selector.create_input")
+@patch("awsui.cli.selector.questionary.select")
 def test_selector_converts_eof_and_closes_terminal_input(
     mock_select,
     mock_create_input,

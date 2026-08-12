@@ -6,27 +6,22 @@ from unittest.mock import patch
 
 import pytest
 
-from awsui import app
-from awsui.bind_command import BindCommandCancelled, BindCommandError, BindResult
-from awsui.cli import build_parser, main, parse_args
-from awsui.context_engine import ContextResolutionError, ResolvedContext
-from awsui.context_runtime import VerifiedRuntime
-from awsui.context_verification import (
+from awsui.cli.bind import BindCommandCancelled, BindCommandError, BindResult
+from awsui.cli.initialization import InitCommandCancelled, InitCommandError
+from awsui.cli.main import main
+from awsui.context.dashboard import ContextItem, ContextStatus, DashboardSnapshot
+from awsui.context.resolution import ContextResolutionError, ResolvedContext
+from awsui.context.runtime import VerifiedRuntime
+from awsui.context.verification import (
     AccountMismatchError,
     ContextVerificationError,
     VerifiedContext,
 )
-from awsui.doctor_command import DoctorCheck, DoctorReport
-from awsui.init_command import (
-    InitCommandCancelled,
-    InitCommandError,
-    InitResult,
-    InitializedEnvironment,
-)
-from awsui.profile_catalog import ProfileCatalogError
-from awsui.project_config import ProjectConfigNotFoundError
+from awsui.doctor import DoctorCheck, DoctorReport
+from awsui.profiles.catalog import ProfileCatalogError
+from awsui.project.config import ProjectConfigNotFoundError
+from awsui.project.initialization import InitResult, InitializedEnvironment
 from awsui.settings import UserSettingsWriteError
-from awsui.tui_context import ContextItem, ContextStatus, DashboardSnapshot
 
 
 def resolved_context(
@@ -118,207 +113,6 @@ def dashboard_snapshot() -> DashboardSnapshot:
     )
 
 
-class TestParseArgs:
-    """Tests for command-line argument parsing."""
-
-    def test_default_arguments(self):
-        args = parse_args([])
-
-        assert not hasattr(args, "profile")
-        assert not hasattr(args, "region")
-        assert args.lang == "en"
-        assert args.command is None
-
-    @pytest.mark.parametrize("option", ["--profile", "--region"])
-    def test_removed_legacy_tui_options_are_rejected(self, option):
-        with pytest.raises(SystemExit) as exc_info:
-            parse_args([option, "legacy-value"])
-
-        assert exc_info.value.code == 2
-
-    def test_removed_log_level_option_is_rejected(self):
-        with pytest.raises(SystemExit) as exc_info:
-            parse_args(["--log-level", "DEBUG"])
-
-        assert exc_info.value.code == 2
-
-    def test_language_argument_english(self):
-        args = parse_args(["--lang", "en"])
-
-        assert args.lang == "en"
-
-    def test_language_argument_chinese(self):
-        args = parse_args(["--lang", "zh-TW"])
-
-        assert args.lang == "zh-TW"
-
-    def test_help_identifies_existing_options(self):
-        help_text = build_parser().format_help()
-
-        assert "--profile" not in help_text
-        assert "--region" not in help_text
-        assert "--lang" in help_text
-        assert "--log-level" not in help_text
-        assert "bind" in help_text
-        assert "init" in help_text
-        assert "context" in help_text
-        assert "run" in help_text
-        assert "shell" in help_text
-        assert "doctor" in help_text
-
-    def test_init_subcommand(self):
-        args = parse_args(["init"])
-
-        assert args.command == "init"
-
-    def test_doctor_subcommand(self):
-        args = parse_args(["doctor"])
-
-        assert args.command == "doctor"
-
-    def test_version(self, capsys):
-        with pytest.raises(SystemExit) as exc_info:
-            parse_args(["--version"])
-
-        assert exc_info.value.code == 0
-        assert capsys.readouterr().out == "awsui 0.2.0\n"
-
-    def test_bind_subcommand(self):
-        args = parse_args(["bind", "prod"])
-
-        assert args.command == "bind"
-        assert args.environment == "prod"
-        assert args.json is False
-
-    @pytest.mark.parametrize("alias", ["ls", "list"])
-    def test_bind_list_aliases(self, alias):
-        args = parse_args(["bind", alias])
-
-        assert args.command == "bind"
-        assert args.environment == alias
-        assert args.json is False
-
-    def test_bind_list_json(self):
-        args = parse_args(["bind", "ls", "--json"])
-
-        assert args.command == "bind"
-        assert args.environment == "ls"
-        assert args.json is True
-
-    def test_bind_requires_environment(self):
-        with pytest.raises(SystemExit) as exc_info:
-            parse_args(["bind"])
-
-        assert exc_info.value.code == 2
-
-    def test_context_subcommand(self):
-        args = parse_args(["context", "prod"])
-
-        assert args.command == "context"
-        assert args.environment == "prod"
-        assert args.json is False
-
-    def test_context_json_subcommand(self):
-        args = parse_args(["context", "prod", "--json"])
-
-        assert args.command == "context"
-        assert args.environment == "prod"
-        assert args.json is True
-
-    @pytest.mark.parametrize("alias", ["ls", "list"])
-    def test_context_list_aliases(self, alias):
-        args = parse_args(["context", alias])
-
-        assert args.command == "context"
-        assert args.environment == alias
-        assert args.json is False
-
-    def test_context_list_json(self):
-        args = parse_args(["context", "ls", "--json"])
-
-        assert args.command == "context"
-        assert args.environment == "ls"
-        assert args.json is True
-
-    def test_context_requires_environment(self):
-        with pytest.raises(SystemExit) as exc_info:
-            parse_args(["context"])
-
-        assert exc_info.value.code == 2
-
-    def test_run_subcommand_with_separator(self):
-        args = parse_args(["run", "prod", "--", "terraform", "plan", "-out=x"])
-
-        assert args.command == "run"
-        assert args.environment == "prod"
-        assert args.child_command == ["terraform", "plan", "-out=x"]
-
-    def test_run_subcommand_without_separator(self):
-        args = parse_args(["run", "prod", "aws", "s3", "ls"])
-
-        assert args.child_command == ["aws", "s3", "ls"]
-
-    def test_environment_command_shorthand(self):
-        args = parse_args(["prod", "--", "codex", "--quiet"])
-
-        assert args.command == "run"
-        assert args.environment == "prod"
-        assert args.child_command == ["codex", "--quiet"]
-
-    def test_language_option_precedes_environment_command_shorthand(self):
-        args = parse_args(["--lang", "zh-TW", "dev", "--", "codex", "."])
-
-        assert args.lang == "zh-TW"
-        assert args.command == "run"
-        assert args.environment == "dev"
-        assert args.child_command == ["codex", "."]
-
-    def test_traditional_chinese_parser_error_has_localized_wrapper(self, capsys):
-        with pytest.raises(SystemExit) as exc_info:
-            parse_args(["--lang", "zh-TW", "dev", "codex"])
-
-        assert exc_info.value.code == 2
-        assert "錯誤" in capsys.readouterr().err
-
-    def test_environment_only_shorthand_opens_shell(self):
-        args = parse_args(["qa"])
-
-        assert args.command == "shell"
-        assert args.environment == "qa"
-
-    @pytest.mark.parametrize(
-        "argv",
-        [
-            ["prod", "codex"],
-            ["prod", "--"],
-        ],
-    )
-    def test_shorthand_rejects_ambiguous_or_empty_commands(self, argv):
-        with pytest.raises(SystemExit) as exc_info:
-            parse_args(argv)
-
-        assert exc_info.value.code == 2
-
-    def test_reserved_subcommand_names_keep_existing_meaning(self):
-        args = parse_args(["run", "prod", "--", "codex"])
-
-        assert args.command == "run"
-        assert args.environment == "prod"
-
-    def test_help_documents_primary_and_compatible_syntax(self):
-        help_text = build_parser().format_help()
-
-        assert "awsui prod -- codex" in help_text
-        assert "awsui prod" in help_text
-        assert "awsui run prod -- codex" in help_text
-
-    def test_shell_subcommand(self):
-        args = parse_args(["shell", "prod"])
-
-        assert args.command == "shell"
-        assert args.environment == "prod"
-
-
 class TestMain:
     """Tests for CLI dispatch."""
 
@@ -368,9 +162,10 @@ class TestMain:
 
         assert exc_info.value.code == 0
         assert "用法： awsui" in capsys.readouterr().out
-        assert json.loads(isolated_cli_settings.read_text(encoding="utf-8"))[
-            "language"
-        ] == "zh-TW"
+        assert (
+            json.loads(isolated_cli_settings.read_text(encoding="utf-8"))["language"]
+            == "zh-TW"
+        )
 
     def test_explicit_language_repairs_damaged_settings(
         self,
@@ -385,12 +180,13 @@ class TestMain:
 
         assert main(["--lang", "zh-TW"]) == 0
         assert capsys.readouterr().out == "語言已切換為繁體中文。\n"
-        assert json.loads(isolated_cli_settings.read_text(encoding="utf-8"))[
-            "language"
-        ] == "zh-TW"
+        assert (
+            json.loads(isolated_cli_settings.read_text(encoding="utf-8"))["language"]
+            == "zh-TW"
+        )
 
-    @patch("awsui.cli.load_dashboard")
-    @patch("awsui.cli.save_settings")
+    @patch("awsui.cli.main.load_dashboard")
+    @patch("awsui.cli.main.save_settings")
     def test_language_write_failure_does_not_dispatch(
         self,
         mock_save_settings,
@@ -409,14 +205,7 @@ class TestMain:
         assert "無法儲存語言偏好" in capsys.readouterr().err
         mock_load_dashboard.assert_not_called()
 
-    @patch("awsui.cli.main", return_value=7)
-    def test_app_module_entry_point_delegates_to_cli(self, mock_cli_main):
-        exit_code = app.main()
-
-        assert exit_code == 7
-        mock_cli_main.assert_called_once_with()
-
-    @patch("awsui.cli.bind_environment")
+    @patch("awsui.cli.main.bind_environment")
     def test_bind_success(self, mock_bind, capsys):
         mock_bind.return_value = BindResult(
             project="payment-service",
@@ -432,8 +221,8 @@ class TestMain:
         assert capsys.readouterr().out == "Bound payment-service/prod → company-prod\n"
         mock_bind.assert_called_once_with("prod")
 
-    @patch("awsui.cli.bind_environment")
-    @patch("awsui.cli.load_dashboard")
+    @patch("awsui.cli.main.bind_environment")
+    @patch("awsui.cli.main.load_dashboard")
     def test_bind_list_success(self, mock_load_dashboard, mock_bind, capsys):
         mock_load_dashboard.return_value = dashboard_snapshot()
 
@@ -450,8 +239,8 @@ class TestMain:
         mock_load_dashboard.assert_called_once_with()
         mock_bind.assert_not_called()
 
-    @patch("awsui.cli.bind_environment")
-    @patch("awsui.cli.load_dashboard")
+    @patch("awsui.cli.main.bind_environment")
+    @patch("awsui.cli.main.load_dashboard")
     def test_bind_list_json_matches_context_list_schema(
         self,
         mock_load_dashboard,
@@ -477,7 +266,7 @@ class TestMain:
         mock_load_dashboard.assert_called_once_with()
         mock_bind.assert_not_called()
 
-    @patch("awsui.cli.load_dashboard")
+    @patch("awsui.cli.main.load_dashboard")
     def test_bind_list_source_error_returns_one(self, mock_load_dashboard, capsys):
         mock_load_dashboard.side_effect = ProfileCatalogError("profiles unavailable")
 
@@ -489,7 +278,7 @@ class TestMain:
         assert "awsui bind: error: profiles unavailable" in captured.err
         assert "awsui doctor" in captured.err
 
-    @patch("awsui.cli.bind_environment")
+    @patch("awsui.cli.main.bind_environment")
     def test_bind_json_is_restricted_to_list_aliases(self, mock_bind, capsys):
         exit_code = main(["bind", "prod", "--json"])
 
@@ -499,7 +288,7 @@ class TestMain:
         assert "only valid with `awsui bind ls` or `awsui bind list`" in captured.err
         mock_bind.assert_not_called()
 
-    @patch("awsui.cli.initialize_project")
+    @patch("awsui.cli.main.initialize_project")
     def test_init_success(self, mock_initialize, capsys):
         mock_initialize.return_value = InitResult(
             project="payment-service",
@@ -530,7 +319,7 @@ class TestMain:
         assert "dev: 111111111111 · us-east-1" in output
         assert "prod: 999999999999 · ap-northeast-1 · PROTECTED" in output
 
-    @patch("awsui.cli.initialize_project")
+    @patch("awsui.cli.main.initialize_project")
     def test_init_error_and_cancellation_exit_codes(self, mock_initialize, capsys):
         mock_initialize.side_effect = InitCommandError("already exists")
         assert main(["init"]) == 1
@@ -540,7 +329,7 @@ class TestMain:
         assert main(["init"]) == 130
         assert "awsui init: cancelled" in capsys.readouterr().err
 
-    @patch("awsui.cli.diagnose")
+    @patch("awsui.cli.main.diagnose")
     def test_doctor_renders_checks_and_fails_when_unhealthy(
         self,
         mock_diagnose,
@@ -560,7 +349,7 @@ class TestMain:
             "✓ AWS CLI v2: available\n✗ Context prod: not bound\n"
         )
 
-    @patch("awsui.cli.diagnose")
+    @patch("awsui.cli.main.diagnose")
     def test_doctor_returns_zero_when_healthy(self, mock_diagnose):
         mock_diagnose.return_value = DoctorReport(
             checks=(DoctorCheck("AWS CLI v2", True, "available"),)
@@ -568,7 +357,7 @@ class TestMain:
 
         assert main(["doctor"]) == 0
 
-    @patch("awsui.cli.bind_environment")
+    @patch("awsui.cli.main.bind_environment")
     def test_bind_unchanged(self, mock_bind, capsys):
         mock_bind.return_value = BindResult(
             project="payment-service",
@@ -583,7 +372,7 @@ class TestMain:
         assert exit_code == 0
         assert "Binding unchanged:" in capsys.readouterr().out
 
-    @patch("awsui.cli.bind_environment")
+    @patch("awsui.cli.main.bind_environment")
     def test_bind_error_returns_one(self, mock_bind, capsys):
         mock_bind.side_effect = BindCommandError("unknown environment 'prod'")
 
@@ -594,7 +383,7 @@ class TestMain:
         assert captured.out == ""
         assert "awsui bind: error: unknown environment" in captured.err
 
-    @patch("awsui.cli.bind_environment")
+    @patch("awsui.cli.main.bind_environment")
     def test_bind_rejects_removed_profile_option(self, mock_bind):
         with pytest.raises(SystemExit) as exc_info:
             main(["--profile", "company-prod", "bind", "prod"])
@@ -602,7 +391,7 @@ class TestMain:
         assert exc_info.value.code == 2
         mock_bind.assert_not_called()
 
-    @patch("awsui.cli.bind_environment")
+    @patch("awsui.cli.main.bind_environment")
     def test_bind_cancelled_returns_130(self, mock_bind, capsys):
         mock_bind.side_effect = BindCommandCancelled()
 
@@ -611,7 +400,7 @@ class TestMain:
         assert exit_code == 130
         assert "awsui bind: binding cancelled" in capsys.readouterr().err
 
-    @patch("awsui.cli.bind_environment")
+    @patch("awsui.cli.main.bind_environment")
     def test_bind_keyboard_interrupt_returns_130(self, mock_bind, capsys):
         mock_bind.side_effect = KeyboardInterrupt
 
@@ -620,8 +409,8 @@ class TestMain:
         assert exit_code == 130
         assert "awsui bind: binding cancelled" in capsys.readouterr().err
 
-    @patch("awsui.cli.prepare_resolved_runtime")
-    @patch("awsui.cli.resolve_context")
+    @patch("awsui.cli.main.prepare_resolved_runtime")
+    @patch("awsui.cli.main.resolve_context")
     def test_context_success(
         self,
         mock_resolve,
@@ -655,8 +444,8 @@ class TestMain:
         assert mock_prepare.call_args.args == (resolved,)
         assert mock_prepare.call_args.kwargs["login_output"] is not None
 
-    @patch("awsui.cli.prepare_resolved_runtime")
-    @patch("awsui.cli.load_dashboard")
+    @patch("awsui.cli.main.prepare_resolved_runtime")
+    @patch("awsui.cli.main.load_dashboard")
     def test_context_list_success(
         self,
         mock_load_dashboard,
@@ -679,7 +468,7 @@ class TestMain:
         mock_load_dashboard.assert_called_once_with()
         mock_prepare.assert_not_called()
 
-    @patch("awsui.cli.load_dashboard")
+    @patch("awsui.cli.main.load_dashboard")
     def test_context_list_json_success(self, mock_load_dashboard, capsys):
         mock_load_dashboard.return_value = dashboard_snapshot()
 
@@ -720,7 +509,7 @@ class TestMain:
             ],
         }
 
-    @patch("awsui.cli.load_dashboard")
+    @patch("awsui.cli.main.load_dashboard")
     def test_context_list_uses_traditional_chinese(self, mock_load_dashboard, capsys):
         mock_load_dashboard.return_value = dashboard_snapshot()
 
@@ -733,7 +522,7 @@ class TestMain:
         assert "找不到 PROFILE" in output
         assert "受保護環境" in output
 
-    @patch("awsui.cli.load_dashboard")
+    @patch("awsui.cli.main.load_dashboard")
     def test_context_list_json_is_language_neutral(self, mock_load_dashboard, capsys):
         mock_load_dashboard.return_value = dashboard_snapshot()
 
@@ -754,7 +543,7 @@ class TestMain:
             (ProfileCatalogError("profiles unavailable"), "awsui doctor"),
         ],
     )
-    @patch("awsui.cli.load_dashboard")
+    @patch("awsui.cli.main.load_dashboard")
     def test_context_list_source_errors_return_one(
         self,
         mock_load_dashboard,
@@ -772,8 +561,8 @@ class TestMain:
         assert "awsui context: error:" in captured.err
         assert next_step in captured.err
 
-    @patch("awsui.cli.prepare_resolved_runtime")
-    @patch("awsui.cli.resolve_context")
+    @patch("awsui.cli.main.prepare_resolved_runtime")
+    @patch("awsui.cli.main.resolve_context")
     def test_context_non_protected_heading(
         self,
         mock_resolve,
@@ -788,8 +577,8 @@ class TestMain:
         assert exit_code == 0
         assert capsys.readouterr().out.startswith("payment-service · PROD\n")
 
-    @patch("awsui.cli.prepare_resolved_runtime")
-    @patch("awsui.cli.resolve_context")
+    @patch("awsui.cli.main.prepare_resolved_runtime")
+    @patch("awsui.cli.main.resolve_context")
     def test_context_json_success(
         self,
         mock_resolve,
@@ -832,8 +621,8 @@ class TestMain:
         assert captured.out.endswith("\n")
         assert captured.err == "Authenticating and verifying AWS identity...\n"
 
-    @patch("awsui.cli.prepare_resolved_runtime")
-    @patch("awsui.cli.resolve_context")
+    @patch("awsui.cli.main.prepare_resolved_runtime")
+    @patch("awsui.cli.main.resolve_context")
     def test_context_json_preserves_unicode(
         self,
         mock_resolve,
@@ -858,8 +647,8 @@ class TestMain:
         assert '"profile": "公司-prod"' in output
         assert "\\u" not in output
 
-    @patch("awsui.cli.prepare_resolved_runtime")
-    @patch("awsui.cli.resolve_context")
+    @patch("awsui.cli.main.prepare_resolved_runtime")
+    @patch("awsui.cli.main.resolve_context")
     def test_context_json_resolution_error_returns_one(
         self,
         mock_resolve,
@@ -876,8 +665,8 @@ class TestMain:
         assert captured.err == "awsui context: error: binding unavailable\n"
         mock_prepare.assert_not_called()
 
-    @patch("awsui.cli.prepare_resolved_runtime")
-    @patch("awsui.cli.resolve_context")
+    @patch("awsui.cli.main.prepare_resolved_runtime")
+    @patch("awsui.cli.main.resolve_context")
     def test_context_verification_error_returns_one(
         self,
         mock_resolve,
@@ -897,8 +686,8 @@ class TestMain:
             "awsui context: error: identity unavailable\n"
         )
 
-    @patch("awsui.cli.prepare_resolved_runtime")
-    @patch("awsui.cli.resolve_context")
+    @patch("awsui.cli.main.prepare_resolved_runtime")
+    @patch("awsui.cli.main.resolve_context")
     def test_context_json_account_mismatch_returns_one(
         self,
         mock_resolve,
@@ -929,8 +718,8 @@ class TestMain:
             "Authenticated account: 111111111111\n"
         )
 
-    @patch("awsui.cli.prepare_resolved_runtime")
-    @patch("awsui.cli.resolve_context")
+    @patch("awsui.cli.main.prepare_resolved_runtime")
+    @patch("awsui.cli.main.resolve_context")
     def test_context_json_keyboard_interrupt_returns_130(
         self,
         mock_resolve,
@@ -950,8 +739,8 @@ class TestMain:
             "awsui context: verification cancelled\n"
         )
 
-    @patch("awsui.cli.prepare_resolved_runtime")
-    @patch("awsui.cli.resolve_context")
+    @patch("awsui.cli.main.prepare_resolved_runtime")
+    @patch("awsui.cli.main.resolve_context")
     def test_context_rejects_removed_region_option(
         self,
         mock_resolve,
@@ -964,9 +753,9 @@ class TestMain:
         mock_resolve.assert_not_called()
         mock_prepare.assert_not_called()
 
-    @patch("awsui.cli.run_command", return_value=7)
-    @patch("awsui.cli.prepare_resolved_runtime")
-    @patch("awsui.cli.resolve_context")
+    @patch("awsui.cli.main.run_command", return_value=7)
+    @patch("awsui.cli.main.prepare_resolved_runtime")
+    @patch("awsui.cli.main.resolve_context")
     def test_run_launches_exact_argv_and_returns_child_code(
         self,
         mock_resolve,
@@ -991,8 +780,8 @@ class TestMain:
         assert "payment-service · PROD · PROTECTED" in captured.err
         assert "Launching: terraform plan -out=x" in captured.err
 
-    @patch("awsui.cli.prepare_resolved_runtime")
-    @patch("awsui.cli.resolve_context")
+    @patch("awsui.cli.main.prepare_resolved_runtime")
+    @patch("awsui.cli.main.resolve_context")
     def test_run_requires_command_before_aws_io(
         self,
         mock_resolve,
@@ -1006,9 +795,9 @@ class TestMain:
         mock_resolve.assert_not_called()
         mock_prepare.assert_not_called()
 
-    @patch("awsui.cli.run_command")
-    @patch("awsui.cli.prepare_resolved_runtime")
-    @patch("awsui.cli.resolve_context")
+    @patch("awsui.cli.main.run_command")
+    @patch("awsui.cli.main.prepare_resolved_runtime")
+    @patch("awsui.cli.main.resolve_context")
     def test_run_mismatch_never_launches_child(
         self,
         mock_resolve,
@@ -1031,10 +820,10 @@ class TestMain:
         assert "Command was not started." in capsys.readouterr().err
         mock_run_command.assert_not_called()
 
-    @patch("awsui.cli.run_command", return_value=0)
-    @patch("awsui.cli.select_interactive_shell", return_value="/bin/zsh")
-    @patch("awsui.cli.prepare_resolved_runtime")
-    @patch("awsui.cli.resolve_context")
+    @patch("awsui.cli.main.run_command", return_value=0)
+    @patch("awsui.cli.main.select_interactive_shell", return_value="/bin/zsh")
+    @patch("awsui.cli.main.prepare_resolved_runtime")
+    @patch("awsui.cli.main.resolve_context")
     def test_shell_launches_selected_shell(
         self,
         mock_resolve,

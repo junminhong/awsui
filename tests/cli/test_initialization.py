@@ -6,13 +6,13 @@ from unittest.mock import patch
 import pytest
 
 from awsui.aws_cli import AwsCliInfo
-from awsui.bindings import LocalBindingsWriteError, load_bindings
-from awsui.init_command import (
+from awsui.cli.initialization import (
     InitCommandCancelled,
     InitCommandError,
     initialize_project,
 )
-from awsui.project_config import load_project_config
+from awsui.project.bindings import LocalBindingsWriteError, load_bindings
+from awsui.project.config import load_project_config
 
 
 def profile(name: str, region: str):
@@ -73,7 +73,7 @@ class TestInitializeProject:
             return {"Account": "999999999999"}
 
         with patch(
-            "awsui.project_initialization.authenticate_profile",
+            "awsui.project.initialization.authenticate_profile",
             side_effect=authenticate,
         ):
             initialize_project(
@@ -141,7 +141,7 @@ class TestInitializeProject:
 
         with (
             patch(
-                "awsui.project_initialization.save_bindings",
+                "awsui.project.initialization.save_bindings",
                 side_effect=write_error,
             ),
             pytest.raises(

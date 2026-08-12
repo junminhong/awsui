@@ -3,8 +3,8 @@
 from pathlib import Path
 from unittest.mock import patch
 
-from awsui.bindings import load_bindings, save_bindings
-from awsui.doctor_command import DoctorCheck, DoctorReport, diagnose
+from awsui.doctor import DoctorCheck, DoctorReport, diagnose
+from awsui.project.bindings import load_bindings, save_bindings
 
 
 PROJECT_CONFIG = """\

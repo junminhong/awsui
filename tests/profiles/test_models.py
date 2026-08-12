@@ -1,6 +1,6 @@
 """Tests for data models."""
 
-from awsui.models import Profile
+from awsui.profiles.models import Profile
 
 
 def test_profile_sso():

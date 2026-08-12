@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from awsui.project_config import (
+from awsui.project.config import (
     PROJECT_CONFIG_FILENAME,
     ProjectConfig,
     ProjectConfigLoadError,

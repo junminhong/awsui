@@ -5,13 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from awsui.tui_context import (
+from awsui.context.dashboard import (
     ContextStatus,
-    LaunchCommandError,
-    detect_tools,
     load_dashboard,
-    parse_launch_command,
 )
+from awsui.tui.launch import LaunchCommandError, detect_tools, parse_launch_command
 
 
 def profile(name: str):

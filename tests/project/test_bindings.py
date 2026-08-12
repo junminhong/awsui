@@ -7,8 +7,8 @@ import stat
 
 import pytest
 
-import awsui.bindings as bindings_module
-from awsui.bindings import (
+import awsui.project.bindings as bindings_module
+from awsui.project.bindings import (
     BINDINGS_VERSION,
     LocalBindings,
     LocalBindingsLoadError,

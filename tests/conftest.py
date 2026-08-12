@@ -10,7 +10,7 @@ def isolated_cli_settings(tmp_path, monkeypatch):
     """Keep CLI preference tests away from the real user settings file."""
     settings_path = tmp_path / ".config" / "awsui" / "settings.json"
     monkeypatch.setattr(
-        "awsui.cli.get_default_settings_path",
+        "awsui.cli.main.get_default_settings_path",
         lambda: settings_path,
     )
     return settings_path

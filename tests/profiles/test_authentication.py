@@ -4,14 +4,14 @@ from unittest.mock import patch
 
 import pytest
 
-from awsui.profile_authentication import (
+from awsui.profiles.authentication import (
     ProfileAuthenticationError,
     ReauthenticationMethod,
     ReauthenticationPlan,
     authenticate_profile,
     resolve_reauthentication_plan,
 )
-from awsui.profile_catalog import ProfileCatalog
+from awsui.profiles.catalog import ProfileCatalog
 
 
 def profile(name, kind, **fields):
@@ -86,8 +86,8 @@ def test_source_cycle_and_missing_profile_are_explicit_errors():
         resolve_reauthentication_plan("missing", cyclic)
 
 
-@patch("awsui.profile_authentication.sso_login", return_value=True)
-@patch("awsui.profile_authentication.get_caller_identity")
+@patch("awsui.profiles.authentication.sso_login", return_value=True)
+@patch("awsui.profiles.authentication.get_caller_identity")
 def test_sso_login_retries_target_identity(mock_identity, mock_login):
     environment = {"AWS_PROFILE": "target"}
     mock_identity.side_effect = [None, {"Account": "999999999999"}]
@@ -112,8 +112,8 @@ def test_sso_login_retries_target_identity(mock_identity, mock_login):
     )
 
 
-@patch("awsui.profile_authentication.console_login", return_value=True)
-@patch("awsui.profile_authentication.get_caller_identity")
+@patch("awsui.profiles.authentication.console_login", return_value=True)
+@patch("awsui.profiles.authentication.get_caller_identity")
 def test_console_login_uses_console_command(mock_identity, mock_login):
     mock_identity.side_effect = [None, {"Account": "111111111111"}]
 
@@ -131,9 +131,9 @@ def test_console_login_uses_console_command(mock_identity, mock_login):
     )
 
 
-@patch("awsui.profile_authentication.console_login")
-@patch("awsui.profile_authentication.sso_login")
-@patch("awsui.profile_authentication.get_caller_identity", return_value=None)
+@patch("awsui.profiles.authentication.console_login")
+@patch("awsui.profiles.authentication.sso_login")
+@patch("awsui.profiles.authentication.get_caller_identity", return_value=None)
 def test_basic_profile_fails_without_wrong_login(
     _mock_identity,
     mock_sso,
