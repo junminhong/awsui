@@ -57,7 +57,7 @@ and launch a tool inside that context.
 
 ### Before you start
 
-Install Python 3.13 and [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html),
+Install Python 3.11–3.14 and [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html),
 then configure at least one AWS profile through AWS CLI. IAM Identity Center
 (SSO) is the recommended authentication method.
 
@@ -67,7 +67,7 @@ The recommended option is an isolated installation with
 [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv tool install --python 3.13 awsui
+uv tool install awsui
 ```
 
 You can also install awsui in the current Python environment with pip:
